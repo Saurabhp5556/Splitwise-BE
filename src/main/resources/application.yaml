@@ -16,6 +16,14 @@ spring:
         format_sql: true
     show-sql: true
   
+  # Jackson configuration for Hibernate
+  jackson:
+    serialization:
+      fail-on-empty-beans: false
+    properties:
+      hibernate:
+        force_lazy_loading: false
+  
   # Application name
   application:
     name: splitwise-application

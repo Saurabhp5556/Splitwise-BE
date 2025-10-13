@@ -1,5 +1,6 @@
 package splitwise.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -8,11 +9,12 @@ import lombok.Setter;
 import java.util.Objects;
 
 @Entity
-@Table(name = "user_pairs", 
+@Table(name = "user_pairs",
        uniqueConstraints = @UniqueConstraint(columnNames = {"user1_id", "user2_id"}))
 @Getter
 @Setter
 @NoArgsConstructor
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class UserPair {
 
     @Id
@@ -21,10 +23,12 @@ public class UserPair {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user1_id", nullable = false)
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private User user1;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user2_id", nullable = false)
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private User user2;
     
     @Column(nullable = false)

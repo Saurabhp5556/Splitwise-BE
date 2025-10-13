@@ -1,5 +1,6 @@
 package splitwise.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -14,6 +15,7 @@ import java.util.Map;
 @Getter
 @Setter
 @NoArgsConstructor
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class Expense {
 
     @Id
@@ -29,6 +31,7 @@ public class Expense {
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "payer_id", nullable = false)
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private User payer;
     
     @ManyToMany(fetch = FetchType.LAZY)
@@ -37,6 +40,7 @@ public class Expense {
         joinColumns = @JoinColumn(name = "expense_id"),
         inverseJoinColumns = @JoinColumn(name = "user_id")
     )
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private List<User> participants;
     
     @ElementCollection
@@ -46,6 +50,7 @@ public class Expense {
     )
     @MapKeyJoinColumn(name = "user_id")
     @Column(name = "share_amount")
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private Map<User, Double> shares;
     
     @Column(nullable = false)
@@ -53,6 +58,7 @@ public class Expense {
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "group_id")
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private Group group;
 
     public Expense(String id, String title, double amount, User payer, List<User> participants, Map<User, Double> shares, LocalDateTime timestamp) {
