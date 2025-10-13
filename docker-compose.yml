@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:14-alpine
+    container_name: splitwise-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: splitwise
+      POSTGRES_USER: splitwise_user
+      POSTGRES_PASSWORD: splitwise_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks:
+      - splitwise-network
+
+volumes:
+  postgres_data:
+    name: splitwise-postgres-data
+
+networks:
+  splitwise-network:
+    name: splitwise-network

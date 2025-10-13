@@ -1,0 +1,50 @@
+package splitwise.model;
+
+import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+import java.util.Objects;
+
+@Entity
+@Table(name = "user_pairs", 
+       uniqueConstraints = @UniqueConstraint(columnNames = {"user1_id", "user2_id"}))
+@Getter
+@Setter
+@NoArgsConstructor
+public class UserPair {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user1_id", nullable = false)
+    private User user1;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user2_id", nullable = false)
+    private User user2;
+    
+    @Column(nullable = false)
+    private Double balance = 0.0;
+
+    public UserPair(User u1, User u2) {
+        this.user1 = u1;
+        this.user2 = u2;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof UserPair)) return false;
+        UserPair that = (UserPair) o;
+        return Objects.equals(user1, that.user1) && Objects.equals(user2, that.user2);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(user1, user2);
+    }
+}
