@@ -1,5 +1,7 @@
 package splitwise.model;
 
+import com.fasterxml.jackson.annotation.JsonGetter;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -7,6 +9,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -50,7 +53,7 @@ public class Expense {
     )
     @MapKeyJoinColumn(name = "user_id")
     @Column(name = "share_amount")
-    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+    @JsonIgnore
     private Map<User, Double> shares;
     
     @Column(nullable = false)
@@ -69,5 +72,18 @@ public class Expense {
         this.participants = participants;
         this.shares = shares;
         this.timestamp = timestamp;
+    }
+    
+    @JsonGetter("shares")
+    public Map<String, Double> getSharesForJson() {
+        if (shares == null) {
+            return new HashMap<>();
+        }
+        
+        Map<String, Double> result = new HashMap<>();
+        for (Map.Entry<User, Double> entry : shares.entrySet()) {
+            result.put(entry.getKey().getUserId(), entry.getValue());
+        }
+        return result;
     }
 }

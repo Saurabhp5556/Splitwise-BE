@@ -14,8 +14,20 @@ public class PercentSplit implements Split {
         Map<User, Double> percentages = (Map<User, Double>) splitDetails.get("percentages");
         Map<User, Double> splits = new HashMap<>();
 
+        // Validate that percentages sum to 100
+        double totalPercentage = 0.0;
+        for (User user : participants) {
+            double userPercentage = percentages.getOrDefault(user, 0.0);
+            totalPercentage += userPercentage;
+        }
+        
+        if (Math.abs(totalPercentage - 100.0) > 0.01) {
+            throw new IllegalArgumentException("Percentages must sum to 100%. Current sum: " + totalPercentage);
+        }
+
         for(User user: participants){
-            double userAmount = amount * percentages.getOrDefault(user, 0.0) /100;
+            double userPercentage = percentages.getOrDefault(user, 0.0);
+            double userAmount = amount * userPercentage / 100.0;
             splits.put(user, userAmount);
         }
 

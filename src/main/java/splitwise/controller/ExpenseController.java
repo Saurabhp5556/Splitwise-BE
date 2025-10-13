@@ -71,11 +71,15 @@ public class ExpenseController {
             SplitTypes splitType = SplitTypes.valueOf(splitTypeStr);
             
             @SuppressWarnings("unchecked")
-            Map<String, Object> splitDetails = request.containsKey("splitDetails") ? 
+            List<String> participantIds = request.containsKey("participantIds") ?
+                (List<String>) request.get("participantIds") : null;
+            
+            @SuppressWarnings("unchecked")
+            Map<String, Object> splitDetails = request.containsKey("splitDetails") ?
                 (Map<String, Object>) request.get("splitDetails") : new HashMap<>();
 
-            Expense expense = expenseService.addGroupExpense(title, description, amount, payerId, 
-                                                           groupId, splitType, splitDetails);
+            Expense expense = expenseService.addGroupExpense(title, description, amount, payerId,
+                                                           groupId, participantIds, splitType, splitDetails);
             return ResponseEntity.status(HttpStatus.CREATED).body(expense);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)

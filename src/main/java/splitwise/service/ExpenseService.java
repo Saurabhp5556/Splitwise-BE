@@ -40,8 +40,11 @@ public class ExpenseService {
             participants.add(userService.getUser(participantId));
         }
         
+        // Convert user IDs to User objects in split details if needed
+        Map<String, Object> processedSplitDetails = processSplitDetails(splitDetails, splitType);
+        
         Split split = SplitFactory.createSplit(splitType);
-        Map<User, Double> shares = split.calculateSplit(amount, participants, splitDetails);
+        Map<User, Double> shares = split.calculateSplit(amount, participants, processedSplitDetails);
         
         String expenseId = UUID.randomUUID().toString();
         Expense expense = new Expense(expenseId, title, amount, payer, participants, shares, LocalDateTime.now());
@@ -52,21 +55,71 @@ public class ExpenseService {
     }
     
     // Add expense to a group
-    public Expense addGroupExpense(String title, String description, double amount, 
-                                  String payerId, Long groupId, 
+    public Expense addGroupExpense(String title, String description, double amount,
+                                  String payerId, Long groupId,
                                   SplitTypes splitType, Map<String, Object> splitDetails) {
         
         User payer = userService.getUser(payerId);
         Group group = groupService.getGroup(groupId);
-        List<User> participants = group.getUserList();
+        List<User> groupMembers = group.getUserList();
+        
+        // Use all group members as participants by default
+        List<User> participants = new ArrayList<>(groupMembers);
         
         // Ensure payer is part of the group
-        if (!participants.contains(payer)) {
+        if (!groupMembers.contains(payer)) {
             throw new IllegalArgumentException("Payer must be a member of the group");
         }
         
+        // Convert user IDs to User objects in split details if needed
+        Map<String, Object> processedSplitDetails = processSplitDetails(splitDetails, splitType);
+        
         Split split = SplitFactory.createSplit(splitType);
-        Map<User, Double> shares = split.calculateSplit(amount, participants, splitDetails);
+        Map<User, Double> shares = split.calculateSplit(amount, participants, processedSplitDetails);
+        
+        String expenseId = UUID.randomUUID().toString();
+        Expense expense = new Expense(expenseId, title, amount, payer, participants, shares, LocalDateTime.now());
+        expense.setDescription(description);
+        expense.setGroup(group);
+        
+        expenseManager.addExpense(expense);
+        return expense;
+    }
+    
+    // Add expense to a group with specific participants
+    public Expense addGroupExpense(String title, String description, double amount,
+                                  String payerId, Long groupId, List<String> participantIds,
+                                  SplitTypes splitType, Map<String, Object> splitDetails) {
+        
+        User payer = userService.getUser(payerId);
+        Group group = groupService.getGroup(groupId);
+        List<User> groupMembers = group.getUserList();
+        
+        // Ensure payer is part of the group
+        if (!groupMembers.contains(payer)) {
+            throw new IllegalArgumentException("Payer must be a member of the group");
+        }
+        
+        // If specific participants are provided, use them; otherwise use all group members
+        List<User> participants = new ArrayList<>();
+        if (participantIds != null && !participantIds.isEmpty()) {
+            for (String participantId : participantIds) {
+                User participant = userService.getUser(participantId);
+                // Ensure all participants are members of the group
+                if (!groupMembers.contains(participant)) {
+                    throw new IllegalArgumentException("User " + participantId + " is not a member of the group");
+                }
+                participants.add(participant);
+            }
+        } else {
+            participants = new ArrayList<>(groupMembers);
+        }
+        
+        // Convert user IDs to User objects in split details if needed
+        Map<String, Object> processedSplitDetails = processSplitDetails(splitDetails, splitType);
+        
+        Split split = SplitFactory.createSplit(splitType);
+        Map<User, Double> shares = split.calculateSplit(amount, participants, processedSplitDetails);
         
         String expenseId = UUID.randomUUID().toString();
         Expense expense = new Expense(expenseId, title, amount, payer, participants, shares, LocalDateTime.now());
@@ -98,8 +151,10 @@ public class ExpenseService {
         
         Map<User, Double> shares;
         if (splitType != null && amount != null) {
+            // Convert user IDs to User objects in split details if needed
+            Map<String, Object> processedSplitDetails = processSplitDetails(splitDetails, splitType);
             Split split = SplitFactory.createSplit(splitType);
-            shares = split.calculateSplit(amount, participants, splitDetails);
+            shares = split.calculateSplit(amount, participants, processedSplitDetails);
         } else if (amount != null) {
             // Recalculate with existing split type
             // This is a simplification - in a real app, you'd need to determine the original split type
@@ -178,5 +233,32 @@ public class ExpenseService {
     public List<Expense> getExpensesByGroup(Long groupId) {
         Group group = groupService.getGroup(groupId);
         return expenseRepository.findByGroup(group);
+    }
+    
+    /**
+     * Process split details to convert user IDs to User objects for percentage splits
+     */
+    private Map<String, Object> processSplitDetails(Map<String, Object> splitDetails, SplitTypes splitType) {
+        if (splitDetails == null || splitType != SplitTypes.SPLIT_BY_PERCENTAGES) {
+            return splitDetails;
+        }
+        
+        Map<String, Object> processedDetails = new HashMap<>(splitDetails);
+        
+        // Handle percentage splits - convert user IDs to User objects
+        if (splitDetails.containsKey("percentages")) {
+            @SuppressWarnings("unchecked")
+            Map<String, Double> userIdPercentages = (Map<String, Double>) splitDetails.get("percentages");
+            
+            Map<User, Double> userPercentages = new HashMap<>();
+            for (Map.Entry<String, Double> entry : userIdPercentages.entrySet()) {
+                User user = userService.getUser(entry.getKey());
+                userPercentages.put(user, entry.getValue());
+            }
+            
+            processedDetails.put("percentages", userPercentages);
+        }
+        
+        return processedDetails;
     }
 }
