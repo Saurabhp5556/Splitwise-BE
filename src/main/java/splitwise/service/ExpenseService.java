@@ -47,7 +47,7 @@ public class ExpenseService {
         Map<User, Double> shares = split.calculateSplit(amount, participants, processedSplitDetails);
         
         String expenseId = UUID.randomUUID().toString();
-        Expense expense = new Expense(expenseId, title, amount, payer, participants, shares, LocalDateTime.now());
+        Expense expense = new Expense(expenseId, title, splitType, amount, payer, participants, shares, LocalDateTime.now());
         expense.setDescription(description);
         
         expenseManager.addExpense(expense);
@@ -78,7 +78,7 @@ public class ExpenseService {
         Map<User, Double> shares = split.calculateSplit(amount, participants, processedSplitDetails);
         
         String expenseId = UUID.randomUUID().toString();
-        Expense expense = new Expense(expenseId, title, amount, payer, participants, shares, LocalDateTime.now());
+        Expense expense = new Expense(expenseId, title, splitType, amount, payer, participants, shares, LocalDateTime.now());
         expense.setDescription(description);
         expense.setGroup(group);
         
@@ -122,7 +122,7 @@ public class ExpenseService {
         Map<User, Double> shares = split.calculateSplit(amount, participants, processedSplitDetails);
         
         String expenseId = UUID.randomUUID().toString();
-        Expense expense = new Expense(expenseId, title, amount, payer, participants, shares, LocalDateTime.now());
+        Expense expense = new Expense(expenseId, title, splitType,amount, payer, participants, shares, LocalDateTime.now());
         expense.setDescription(description);
         expense.setGroup(group);
         
@@ -166,7 +166,7 @@ public class ExpenseService {
         
         Expense updatedExpense = new Expense(
             expenseId,
-            title != null ? title : existingExpense.getTitle(),
+            title != null ? title : existingExpense.getTitle(), splitType,
             amount != null ? amount : existingExpense.getAmount(),
             payer,
             participants,
@@ -189,6 +189,7 @@ public class ExpenseService {
         Expense reverseExpense = new Expense(
             UUID.randomUUID().toString(),
             "Reversal of: " + expenseToDelete.getTitle(),
+                expenseToDelete.getSplitType(),
             -expenseToDelete.getAmount(),
             expenseToDelete.getPayer(),
             expenseToDelete.getParticipants(),
@@ -253,7 +254,13 @@ public class ExpenseService {
             Map<User, Double> userPercentages = new HashMap<>();
             for (Map.Entry<String, Double> entry : userIdPercentages.entrySet()) {
                 User user = userService.getUser(entry.getKey());
-                userPercentages.put(user, entry.getValue());
+                try{
+                    userPercentages.put(user, entry.getValue().doubleValue());
+
+                } catch (Exception e){
+                    Exception e1 = e;
+                }
+                entry.getValue();
             }
             
             processedDetails.put("percentages", userPercentages);
