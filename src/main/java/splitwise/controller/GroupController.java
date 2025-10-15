@@ -51,7 +51,7 @@ public class GroupController {
     }
 
     @GetMapping("/{groupId}")
-    public ResponseEntity<Group> getGroupById(@PathVariable Long groupId) {
+    public ResponseEntity<Group> getGroupById(@PathVariable String groupId) {
         logger.info("Fetching group with ID: {}", groupId);
         Group group = groupService.getGroup(groupId);
         logger.info("Successfully found group: {}", group.getName());
@@ -59,7 +59,7 @@ public class GroupController {
     }
 
     @PostMapping("/{groupId}/users")
-    public ResponseEntity<Group> addUserToGroup(@PathVariable Long groupId, @RequestBody Map<String, String> request) {
+    public ResponseEntity<Group> addUserToGroup(@PathVariable String groupId, @RequestBody Map<String, String> request) {
         logger.info("Adding user to group {} with request: {}", groupId, request);
         
         String userId = request.get("userId");
@@ -73,7 +73,7 @@ public class GroupController {
     }
 
     @DeleteMapping("/{groupId}/users/{userId}")
-    public ResponseEntity<Group> removeUserFromGroup(@PathVariable Long groupId, @PathVariable String userId) {
+    public ResponseEntity<Group> removeUserFromGroup(@PathVariable String groupId, @PathVariable String userId) {
         logger.info("Removing user {} from group {}", userId, groupId);
         
         Group group = groupService.removeUserFromGroup(groupId, userId);
@@ -82,7 +82,7 @@ public class GroupController {
     }
 
     @DeleteMapping("/{groupId}")
-    public ResponseEntity<Void> deleteGroup(@PathVariable Long groupId) {
+    public ResponseEntity<Void> deleteGroup(@PathVariable String groupId) {
         logger.info("Deleting group with ID: {}", groupId);
         groupService.deleteGroup(groupId);
         logger.info("Successfully deleted group with ID: {}", groupId);
@@ -90,7 +90,7 @@ public class GroupController {
     }
 
     @PutMapping("/{groupId}")
-    public ResponseEntity<Group> updateGroup(@PathVariable Long groupId, @RequestBody Map<String, String> request) {
+    public ResponseEntity<Group> updateGroup(@PathVariable String groupId, @RequestBody Map<String, String> request) {
         logger.info("Updating group {} with request: {}", groupId, request);
         
         String name = request.get("name");

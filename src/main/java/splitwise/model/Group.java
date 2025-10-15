@@ -17,8 +17,7 @@ import java.util.List;
 public class Group {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long groupId;
+    private String groupId;
     
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(

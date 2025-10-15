@@ -82,7 +82,7 @@ public class ExpenseController {
         String description = (String) request.get("description");
         Double amount = Double.parseDouble(request.get("amount").toString());
         String payerId = (String) request.get("payerId");
-        Long groupId = Long.parseLong(request.get("groupId").toString());
+        String groupId = request.get("groupId").toString();
         String splitTypeStr = (String) request.get("splitType");
         
         SplitTypes splitType;
@@ -209,15 +209,14 @@ public class ExpenseController {
         }
         
         // Validate group ID
-        try {
-            Long.parseLong(request.get("groupId").toString());
-        } catch (NumberFormatException e) {
-            throw new IllegalArgumentException("Group ID must be a valid number");
+        String groupId = request.get("groupId").toString();
+        if (groupId == null || groupId.trim().isEmpty()) {
+            throw new IllegalArgumentException("Group ID must be a valid string");
         }
     }
 
     @GetMapping("/group/{groupId}")
-    public ResponseEntity<List<Expense>> getAllGroupExpenses(@PathVariable("groupId") Long groupId) {
+    public ResponseEntity<List<Expense>> getAllGroupExpenses(@PathVariable("groupId") String groupId) {
         return ResponseEntity.ok(expenseService.getExpensesByGroup(groupId));
     }
 }

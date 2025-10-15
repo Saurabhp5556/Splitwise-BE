@@ -56,7 +56,7 @@ public class ExpenseService {
     
     // Add expense to a group
     public Expense addGroupExpense(String title, String description, double amount,
-                                  String payerId, Long groupId,
+                                  String payerId, String groupId,
                                   SplitTypes splitType, Map<String, Object> splitDetails) {
         
         User payer = userService.getUser(payerId);
@@ -88,7 +88,7 @@ public class ExpenseService {
     
     // Add expense to a group with specific participants
     public Expense addGroupExpense(String title, String description, double amount,
-                                  String payerId, Long groupId, List<String> participantIds,
+                                  String payerId, String groupId, List<String> participantIds,
                                   SplitTypes splitType, Map<String, Object> splitDetails) {
         
         User payer = userService.getUser(payerId);
@@ -233,7 +233,7 @@ public class ExpenseService {
     }
     
     // Get expenses by group
-    public List<Expense> getExpensesByGroup(Long groupId) {
+    public List<Expense> getExpensesByGroup(String groupId) {
         Group group = groupService.getGroup(groupId);
         return expenseRepository.findByGroup(group);
     }
