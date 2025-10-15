@@ -56,7 +56,7 @@ public class ExpenseService {
     
     // Add expense to a group
     public Expense addGroupExpense(String title, String description, double amount,
-                                  String payerId, Long groupId,
+                                  String payerId, String groupId,
                                   SplitTypes splitType, Map<String, Object> splitDetails) {
         
         User payer = userService.getUser(payerId);
@@ -88,7 +88,7 @@ public class ExpenseService {
     
     // Add expense to a group with specific participants
     public Expense addGroupExpense(String title, String description, double amount,
-                                  String payerId, Long groupId, List<String> participantIds,
+                                  String payerId, String groupId, List<String> participantIds,
                                   SplitTypes splitType, Map<String, Object> splitDetails) {
         
         User payer = userService.getUser(payerId);
@@ -233,23 +233,23 @@ public class ExpenseService {
     }
     
     // Get expenses by group
-    public List<Expense> getExpensesByGroup(Long groupId) {
+    public List<Expense> getExpensesByGroup(String groupId) {
         Group group = groupService.getGroup(groupId);
         return expenseRepository.findByGroup(group);
     }
     
     /**
-     * Process split details to convert user IDs to User objects for percentage splits
+     * Process split details to convert user IDs to User objects for percentage and share splits
      */
     private Map<String, Object> processSplitDetails(Map<String, Object> splitDetails, SplitTypes splitType) {
-        if (splitDetails == null || splitType != SplitTypes.SPLIT_BY_PERCENTAGES) {
+        if (splitDetails == null) {
             return splitDetails;
         }
         
         Map<String, Object> processedDetails = new HashMap<>(splitDetails);
         
         // Handle percentage splits - convert user IDs to User objects
-        if (splitDetails.containsKey("percentages")) {
+        if (splitType == SplitTypes.SPLIT_BY_PERCENTAGES && splitDetails.containsKey("percentages")) {
             @SuppressWarnings("unchecked")
             Map<String, Double> userIdPercentages = (Map<String, Double>) splitDetails.get("percentages");
             
@@ -266,6 +266,34 @@ public class ExpenseService {
             }
             
             processedDetails.put("percentages", userPercentages);
+        }
+        
+        // Handle share splits - convert user IDs to User objects
+        if (splitType == SplitTypes.SHARES_SPLIT && splitDetails.containsKey("shares")) {
+            @SuppressWarnings("unchecked")
+            Map<String, Double> userIdShares = (Map<String, Double>) splitDetails.get("shares");
+            
+            Map<User, Double> userShares = new HashMap<>();
+            for (Map.Entry<String, Double> entry : userIdShares.entrySet()) {
+                User user = userService.getUser(entry.getKey());
+                userShares.put(user, entry.getValue());
+            }
+            
+            processedDetails.put("shares", userShares);
+        }
+        
+        // Handle exact amount splits - convert user IDs to User objects
+        if (splitType == SplitTypes.EXACT_AMOUNT_SPLIT && splitDetails.containsKey("amounts")) {
+            @SuppressWarnings("unchecked")
+            Map<String, Double> userIdAmounts = (Map<String, Double>) splitDetails.get("amounts");
+            
+            Map<User, Double> userAmounts = new HashMap<>();
+            for (Map.Entry<String, Double> entry : userIdAmounts.entrySet()) {
+                User user = userService.getUser(entry.getKey());
+                userAmounts.put(user, entry.getValue());
+            }
+            
+            processedDetails.put("amounts", userAmounts);
         }
         
         return processedDetails;

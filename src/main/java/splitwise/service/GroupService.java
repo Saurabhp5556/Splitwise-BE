@@ -23,6 +23,10 @@ public class GroupService {
 
     public Group createGroup(String name, String description, List<String> userIds) {
         Group group = new Group();
+        
+        // Generate a unique group ID
+        String groupId = generateGroupId();
+        group.setGroupId(groupId);
         group.setName(name);
         group.setDescription(description);
 
@@ -34,8 +38,28 @@ public class GroupService {
 
         return groupRepository.save(group);
     }
+    
+    private String generateGroupId() {
+        // Find the highest existing group ID number
+        List<Group> allGroups = groupRepository.findAll();
+        int maxId = 0;
+        
+        for (Group group : allGroups) {
+            String groupId = group.getGroupId();
+            if (groupId != null && groupId.startsWith("g")) {
+                try {
+                    int id = Integer.parseInt(groupId.substring(1));
+                    maxId = Math.max(maxId, id);
+                } catch (NumberFormatException e) {
+                    // Ignore invalid group IDs
+                }
+            }
+        }
+        
+        return "g" + (maxId + 1);
+    }
 
-    public Group getGroup(Long groupId) {
+    public Group getGroup(String groupId) {
         return groupRepository.findById(groupId)
                 .orElseThrow(() -> new IllegalArgumentException("Group with ID " + groupId + " not found"));
     }
@@ -44,7 +68,7 @@ public class GroupService {
         return groupRepository.findAll();
     }
 
-    public Group addUserToGroup(Long groupId, String userId) {
+    public Group addUserToGroup(String groupId, String userId) {
         Group group = getGroup(groupId);
         User user = userService.getUser(userId);
 
@@ -57,7 +81,7 @@ public class GroupService {
         return groupRepository.save(group);
     }
 
-    public Group removeUserFromGroup(Long groupId, String userId) {
+    public Group removeUserFromGroup(String groupId, String userId) {
         Group group = getGroup(groupId);
         User user = userService.getUser(userId);
 
@@ -66,28 +90,53 @@ public class GroupService {
             throw new IllegalArgumentException("User is not a member of this group");
         }
 
-        // Check if user has zero balance in the group
-        for (User otherUser : group.getUserList()) {
-            if (!otherUser.equals(user)) {
-                double balance = balanceSheet.getBalance(user, otherUser);
-                if (Math.abs(balance) > 0.001) {
-                    throw new IllegalArgumentException("Cannot remove user from group as they have non-zero balance");
-                }
-            }
-        }
+        // Check if user has unsettled balances with other group members
+        validateUserCanLeaveGroup(user, group);
 
         group.getUserList().remove(user);
         return groupRepository.save(group);
     }
+    
+    private void validateUserCanLeaveGroup(User user, Group group) {
+        List<String> balanceIssues = new ArrayList<>();
+        double totalGroupBalance = 0.0;
+        
+        for (User otherUser : group.getUserList()) {
+            if (!otherUser.equals(user)) {
+                double balance = balanceSheet.getBalance(user, otherUser);
+                if (Math.abs(balance) > 0.001) {
+                    String balanceDescription;
+                    if (balance > 0) {
+                        balanceDescription = String.format("%s owes you Rs. %.2f", otherUser.getName(), balance);
+                    } else {
+                        balanceDescription = String.format("You owe %s Rs. %.2f", otherUser.getName(), Math.abs(balance));
+                    }
+                    balanceIssues.add(balanceDescription);
+                    totalGroupBalance += balance;
+                }
+            }
+        }
+        
+        if (!balanceIssues.isEmpty()) {
+            String errorMessage = String.format(
+                "Cannot remove user '%s' from group '%s' due to unsettled balances:\n%s\n\nTotal balance: Rs. %.2f\n\nPlease settle all balances before leaving the group.",
+                user.getName(),
+                group.getName(),
+                String.join("\n", balanceIssues),
+                totalGroupBalance
+            );
+            throw new IllegalArgumentException(errorMessage);
+        }
+    }
 
-    public void deleteGroup(Long groupId) {
+    public void deleteGroup(String groupId) {
         if (!groupRepository.existsById(groupId)) {
             throw new IllegalArgumentException("Group with ID " + groupId + " not found");
         }
         groupRepository.deleteById(groupId);
     }
 
-    public Group updateGroup(Long groupId, String name, String description) {
+    public Group updateGroup(String groupId, String name, String description) {
         Group group = getGroup(groupId);
         
         if (name != null) {

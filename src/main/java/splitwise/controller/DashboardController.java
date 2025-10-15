@@ -1,5 +1,7 @@
 package splitwise.controller;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -11,6 +13,8 @@ import java.util.Map;
 @RequestMapping("/api/dashboard")
 public class DashboardController {
 
+    private static final Logger logger = LoggerFactory.getLogger(DashboardController.class);
+
     @Autowired
     private DashboardService dashboardService;
 
@@ -19,12 +23,15 @@ public class DashboardController {
      */
     @GetMapping("/users/{userId}")
     public ResponseEntity<Map<String, Object>> getUserDashboard(@PathVariable String userId) {
-        try {
-            Map<String, Object> dashboardData = dashboardService.getDashboardData(userId);
-            return ResponseEntity.ok(dashboardData);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.notFound().build();
+        logger.info("Fetching dashboard data for user: {}", userId);
+        
+        if (userId == null || userId.trim().isEmpty()) {
+            throw new IllegalArgumentException("User ID is required and cannot be empty");
         }
+        
+        Map<String, Object> dashboardData = dashboardService.getDashboardData(userId);
+        logger.info("Successfully retrieved dashboard data for user: {}", userId);
+        return ResponseEntity.ok(dashboardData);
     }
 
     /**
@@ -32,12 +39,15 @@ public class DashboardController {
      */
     @GetMapping("/users/{userId}/groups")
     public ResponseEntity<Map<String, Object>> getUserGroups(@PathVariable String userId) {
-        try {
-            Map<String, Object> groupsData = dashboardService.getUserGroupsWithBalances(userId);
-            return ResponseEntity.ok(groupsData);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.notFound().build();
+        logger.info("Fetching groups with balances for user: {}", userId);
+        
+        if (userId == null || userId.trim().isEmpty()) {
+            throw new IllegalArgumentException("User ID is required and cannot be empty");
         }
+        
+        Map<String, Object> groupsData = dashboardService.getUserGroupsWithBalances(userId);
+        logger.info("Successfully retrieved groups data for user: {}", userId);
+        return ResponseEntity.ok(groupsData);
     }
 
     /**
@@ -45,11 +55,14 @@ public class DashboardController {
      */
     @GetMapping("/users/{userId}/balances")
     public ResponseEntity<Map<String, Object>> getUserBalances(@PathVariable String userId) {
-        try {
-            Map<String, Object> balancesData = dashboardService.getUserBalances(userId);
-            return ResponseEntity.ok(balancesData);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.notFound().build();
+        logger.info("Fetching user balances for user: {}", userId);
+        
+        if (userId == null || userId.trim().isEmpty()) {
+            throw new IllegalArgumentException("User ID is required and cannot be empty");
         }
+        
+        Map<String, Object> balancesData = dashboardService.getUserBalances(userId);
+        logger.info("Successfully retrieved balances data for user: {}", userId);
+        return ResponseEntity.ok(balancesData);
     }
 }
