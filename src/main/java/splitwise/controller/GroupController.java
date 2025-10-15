@@ -1,5 +1,7 @@
 package splitwise.controller;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -14,90 +16,88 @@ import java.util.Map;
 @RequestMapping("/api/groups")
 public class GroupController {
 
+    private static final Logger logger = LoggerFactory.getLogger(GroupController.class);
+
     @Autowired
     private GroupService groupService;
 
     @PostMapping
     public ResponseEntity<Group> createGroup(@RequestBody Map<String, Object> request) {
-        try {
-            String name = (String) request.get("name");
-            String description = (String) request.get("description");
-            @SuppressWarnings("unchecked")
-            List<String> userIds = (List<String>) request.get("userIds");
+        logger.info("Creating group with request: {}", request);
+        
+        String name = (String) request.get("name");
+        String description = (String) request.get("description");
+        @SuppressWarnings("unchecked")
+        List<String> userIds = (List<String>) request.get("userIds");
 
-            if (name == null || userIds == null || userIds.isEmpty()) {
-                return ResponseEntity.badRequest().build();
-            }
-
-            Group group = groupService.createGroup(name, description, userIds);
-            return ResponseEntity.status(HttpStatus.CREATED).body(group);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().build();
+        if (name == null || name.trim().isEmpty()) {
+            throw new IllegalArgumentException("Group name is required and cannot be empty");
         }
+        if (userIds == null || userIds.isEmpty()) {
+            throw new IllegalArgumentException("At least one user ID is required to create a group");
+        }
+
+        Group group = groupService.createGroup(name, description, userIds);
+        logger.info("Successfully created group with ID: {} and name: {}", group.getGroupId(), group.getName());
+        return ResponseEntity.status(HttpStatus.CREATED).body(group);
     }
 
     @GetMapping
     public ResponseEntity<List<Group>> getAllGroups() {
-        return ResponseEntity.ok(groupService.getAllGroups());
+        logger.info("Fetching all groups");
+        List<Group> groups = groupService.getAllGroups();
+        logger.info("Found {} groups", groups.size());
+        return ResponseEntity.ok(groups);
     }
 
     @GetMapping("/{groupId}")
-    public ResponseEntity<Group> getGroupById(@PathVariable("groupId") Long groupId) {
-        try {
-            Group group = groupService.getGroup(groupId);
-            return ResponseEntity.ok(group);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.notFound().build();
-        }
+    public ResponseEntity<Group> getGroupById(@PathVariable Long groupId) {
+        logger.info("Fetching group with ID: {}", groupId);
+        Group group = groupService.getGroup(groupId);
+        logger.info("Successfully found group: {}", group.getName());
+        return ResponseEntity.ok(group);
     }
 
     @PostMapping("/{groupId}/users")
-    public ResponseEntity<Group> addUserToGroup(@PathVariable("groupId") Long groupId, @RequestBody Map<String, String> request) {
-        try {
-            String userId = request.get("userId");
-            if (userId == null) {
-                System.out.println("userId is null");
-                return ResponseEntity.badRequest().build();
-            }
-
-            Group group = groupService.addUserToGroup(groupId, userId);
-            return ResponseEntity.ok(group);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null);
+    public ResponseEntity<Group> addUserToGroup(@PathVariable Long groupId, @RequestBody Map<String, String> request) {
+        logger.info("Adding user to group {} with request: {}", groupId, request);
+        
+        String userId = request.get("userId");
+        if (userId == null || userId.trim().isEmpty()) {
+            throw new IllegalArgumentException("User ID is required and cannot be empty");
         }
+
+        Group group = groupService.addUserToGroup(groupId, userId);
+        logger.info("Successfully added user {} to group {}", userId, groupId);
+        return ResponseEntity.ok(group);
     }
 
     @DeleteMapping("/{groupId}/users/{userId}")
-    public ResponseEntity<?> removeUserFromGroup(@PathVariable("groupId") Long groupId, @PathVariable("userId") String userId) {
-        try {
-            Group group = groupService.removeUserFromGroup(groupId, userId);
-            return ResponseEntity.ok(group);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(Map.of("error", e.getMessage()));
-        }
+    public ResponseEntity<Group> removeUserFromGroup(@PathVariable Long groupId, @PathVariable String userId) {
+        logger.info("Removing user {} from group {}", userId, groupId);
+        
+        Group group = groupService.removeUserFromGroup(groupId, userId);
+        logger.info("Successfully removed user {} from group {}", userId, groupId);
+        return ResponseEntity.ok(group);
     }
 
     @DeleteMapping("/{groupId}")
-    public ResponseEntity<Void> deleteGroup(@PathVariable("groupId") Long groupId) {
-        try {
-            groupService.deleteGroup(groupId);
-            return ResponseEntity.noContent().build();
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.notFound().build();
-        }
+    public ResponseEntity<Void> deleteGroup(@PathVariable Long groupId) {
+        logger.info("Deleting group with ID: {}", groupId);
+        groupService.deleteGroup(groupId);
+        logger.info("Successfully deleted group with ID: {}", groupId);
+        return ResponseEntity.noContent().build();
     }
 
     @PutMapping("/{groupId}")
-    public ResponseEntity<Group> updateGroup(@PathVariable("groupId") Long groupId, @RequestBody Map<String, String> request) {
-        try {
-            String name = request.get("name");
-            String description = request.get("description");
+    public ResponseEntity<Group> updateGroup(@PathVariable Long groupId, @RequestBody Map<String, String> request) {
+        logger.info("Updating group {} with request: {}", groupId, request);
+        
+        String name = request.get("name");
+        String description = request.get("description");
 
-            Group group = groupService.updateGroup(groupId, name, description);
-            return ResponseEntity.ok(group);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.notFound().build();
-        }
+        Group group = groupService.updateGroup(groupId, name, description);
+        logger.info("Successfully updated group with ID: {}", groupId);
+        return ResponseEntity.ok(group);
     }
 }
