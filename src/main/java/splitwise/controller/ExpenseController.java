@@ -129,4 +129,9 @@ public class ExpenseController {
             return ResponseEntity.notFound().build();
         }
     }
+
+    @GetMapping("/group/{groupId}")
+    public ResponseEntity<List<Expense>> getAllGroupExpenses(@PathVariable("groupId") Long groupId) {
+        return ResponseEntity.ok(expenseService.getExpensesByGroup(groupId));
+    }
 }
