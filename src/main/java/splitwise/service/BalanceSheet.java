@@ -1,6 +1,8 @@
 package splitwise.service;
 
+import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import splitwise.model.Expense;
 import splitwise.model.Transaction;
@@ -10,13 +12,26 @@ import splitwise.repository.TransactionRepository;
 import splitwise.repository.UserPairRepository;
 import splitwise.util.ExpenseObserver;
 
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+/**
+ * BalanceSheet Service - Manages financial balances between users
+ *
+ * This service is responsible for:
+ * 1. Tracking who owes money to whom (UserPair records)
+ * 2. Calculating net balances for users
+ * 3. Generating simplified settlement transactions
+ * 4. Automatically updating balances when expenses are created/modified
+ *
+ * Key Concepts:
+ * - UserPair: Represents a debt relationship where user1 owes user2 a certain amount
+ * - Observer Pattern: Automatically updates balances when expenses change
+ * - Net Balance: Overall amount a user owes or is owed across all relationships
+ */
 @Service
 public class BalanceSheet implements ExpenseObserver {
 
@@ -25,6 +40,15 @@ public class BalanceSheet implements ExpenseObserver {
     
     @Autowired
     private TransactionRepository transactionRepository;
+    
+    @Autowired
+    @Lazy
+    private ExpenseManager expenseManager;
+    
+    @PostConstruct
+    public void init() {
+        expenseManager.addObserver(this);
+    }
 
     @Override
     public void onExpenseAdded(Expense expense) {
@@ -36,6 +60,11 @@ public class BalanceSheet implements ExpenseObserver {
         updateBalances(expense);
     }
 
+    /**
+     * Updates user balances when an expense is added or modified.
+     * For each participant who didn't pay, creates or updates a UserPair record
+     * indicating how much they owe the payer.
+     */
     private void updateBalances(Expense expense) {
         User payer = expense.getPayer();
         Map<User, Double> shares = expense.getShares();
@@ -44,23 +73,29 @@ public class BalanceSheet implements ExpenseObserver {
             User participant = entry.getKey();
             Double amount = entry.getValue();
 
+            // Skip the payer - they don't owe themselves
             if (!participant.equals(payer)) {
-                UserPair userPair = new UserPair(participant, payer);
-                
-                // Find existing user pair or create a new one
-                Optional<UserPair> existingPair = userPairRepository.findByUser1AndUser2(participant, payer);
-                
-                if (existingPair.isPresent()) {
-                    UserPair pair = existingPair.get();
-                    pair.setBalance(pair.getBalance() + amount);
-                    userPairRepository.save(pair);
-                } else {
-                    userPair.setBalance(amount);
-                    userPairRepository.save(userPair);
-                }
-                
-                System.out.println(userPair.getUser1().getName() + " Will pay " + userPair.getUser2().getName() + " Rs. " + amount);
+                updateUserPairBalance(participant, payer, amount);
             }
+        }
+    }
+
+    /**
+     * Updates or creates a UserPair record for the balance between two users.
+     */
+    private void updateUserPairBalance(User debtor, User creditor, Double amount) {
+        Optional<UserPair> existingPair = userPairRepository.findByUser1AndUser2(debtor, creditor);
+        
+        if (existingPair.isPresent()) {
+            // Update existing balance
+            UserPair pair = existingPair.get();
+            pair.setBalance(pair.getBalance() + amount);
+            userPairRepository.save(pair);
+        } else {
+            // Create new UserPair
+            UserPair newPair = new UserPair(debtor, creditor);
+            newPair.setBalance(amount);
+            userPairRepository.save(newPair);
         }
     }
 
@@ -84,7 +119,11 @@ public class BalanceSheet implements ExpenseObserver {
         return total;
     }
 
-    public List<Transaction> getSimplifiedSettlements() {
+    /**
+     * Calculates the net balance for each user across all their relationships.
+     * Positive balance means the user is owed money, negative means they owe money.
+     */
+    private Map<User, Double> calculateNetBalances() {
         Map<User, Double> netBalances = new HashMap<>();
         List<UserPair> allPairs = userPairRepository.findAll();
         
@@ -93,10 +132,19 @@ public class BalanceSheet implements ExpenseObserver {
             User creditor = pair.getUser2();
             Double amount = pair.getBalance();
             
-            System.out.println("Debtor: " + debtor.getName() + ", Creditor: " + creditor.getName() + ", Amount: " + amount);
             netBalances.put(debtor, netBalances.getOrDefault(debtor, 0.0) - amount);
             netBalances.put(creditor, netBalances.getOrDefault(creditor, 0.0) + amount);
         }
+        
+        return netBalances;
+    }
+
+    /**
+     * Calculates simplified settlements to minimize the number of transactions needed
+     * to settle all balances between users.
+     */
+    public List<Transaction> getSimplifiedSettlements() {
+        Map<User, Double> netBalances = calculateNetBalances();
 
         List<User> debtorsList = new ArrayList<>();
         List<User> creditorsList = new ArrayList<>();
@@ -140,18 +188,12 @@ public class BalanceSheet implements ExpenseObserver {
         return transactions;
     }
 
+    /**
+     * Calculates the minimum number of transactions needed to settle all balances
+     * using a sub-optimal but efficient algorithm.
+     */
     public int getSubOptimalMinimumSettlements() {
-        Map<User, Double> netBalances = new HashMap<>();
-        List<UserPair> allPairs = userPairRepository.findAll();
-        
-        for (UserPair pair : allPairs) {
-            User debtor = pair.getUser1();
-            User creditor = pair.getUser2();
-            Double amount = pair.getBalance();
-
-            netBalances.put(debtor, netBalances.getOrDefault(debtor, 0.0) - amount);
-            netBalances.put(creditor, netBalances.getOrDefault(creditor, 0.0) + amount);
-        }
+        Map<User, Double> netBalances = calculateNetBalances();
 
         List<Double> creditorList = new ArrayList<>();
 
