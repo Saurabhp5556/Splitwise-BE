@@ -47,7 +47,7 @@ public class ExpenseService {
         Map<User, Double> shares = split.calculateSplit(amount, participants, processedSplitDetails);
         
         String expenseId = UUID.randomUUID().toString();
-        Expense expense = new Expense(expenseId, title, splitType, amount, payer, participants, shares, LocalDateTime.now());
+        Expense expense = new Expense(expenseId, title, splitType, amount, payer, participants, shares, splitDetails, LocalDateTime.now());
         expense.setDescription(description);
         
         expenseManager.addExpense(expense);
@@ -78,7 +78,7 @@ public class ExpenseService {
         Map<User, Double> shares = split.calculateSplit(amount, participants, processedSplitDetails);
         
         String expenseId = UUID.randomUUID().toString();
-        Expense expense = new Expense(expenseId, title, splitType, amount, payer, participants, shares, LocalDateTime.now());
+        Expense expense = new Expense(expenseId, title, splitType, amount, payer, participants, shares, splitDetails, LocalDateTime.now());
         expense.setDescription(description);
         expense.setGroup(group);
         
@@ -122,7 +122,7 @@ public class ExpenseService {
         Map<User, Double> shares = split.calculateSplit(amount, participants, processedSplitDetails);
         
         String expenseId = UUID.randomUUID().toString();
-        Expense expense = new Expense(expenseId, title, splitType,amount, payer, participants, shares, LocalDateTime.now());
+        Expense expense = new Expense(expenseId, title, splitType,amount, payer, participants, shares, splitDetails,  LocalDateTime.now());
         expense.setDescription(description);
         expense.setGroup(group);
         
@@ -171,6 +171,7 @@ public class ExpenseService {
             payer,
             participants,
             shares,
+                splitDetails,
             LocalDateTime.now()
         );
         
@@ -194,6 +195,7 @@ public class ExpenseService {
             expenseToDelete.getPayer(),
             expenseToDelete.getParticipants(),
             createReverseShares(expenseToDelete.getShares()),
+                expenseToDelete.getSplitDetails(),
             LocalDateTime.now()
         );
         

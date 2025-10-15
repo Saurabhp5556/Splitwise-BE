@@ -7,6 +7,8 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import splitwise.util.SplitTypes;
 
 import java.time.LocalDateTime;
@@ -60,6 +62,10 @@ public class Expense {
     @Column(name = "share_amount")
     @JsonIgnore
     private Map<User, Double> shares;
+
+    @Column(name = "split_details")
+    @JdbcTypeCode(SqlTypes.JSON)
+    private Map<String, Object> splitDetails;
     
     @Column(nullable = false)
     private LocalDateTime timestamp;
@@ -69,7 +75,7 @@ public class Expense {
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private Group group;
 
-    public Expense(String id, String title, SplitTypes splitType,double amount, User payer, List<User> participants, Map<User, Double> shares, LocalDateTime timestamp) {
+    public Expense(String id, String title, SplitTypes splitType,double amount, User payer, List<User> participants, Map<User, Double> shares, Map<String, Object> splitDetails, LocalDateTime timestamp) {
         this.id = id;
         this.title = title;
         this.amount = amount;
@@ -77,6 +83,7 @@ public class Expense {
         this.payer = payer;
         this.participants = participants;
         this.shares = shares;
+        this.splitDetails = splitDetails;
         this.timestamp = timestamp;
     }
     
