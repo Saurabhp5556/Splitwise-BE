@@ -31,7 +31,7 @@ public class ExpenseService {
     // Add expense between two users (or more)
     public Expense addExpense(String title, String description, double amount, 
                              String payerId, List<String> participantIds, 
-                             SplitTypes splitType, Map<String, Object> splitDetails) {
+                             SplitTypes splitType, Map<String, Object> splitDetails,Boolean isSettleUp) {
         
         User payer = userService.getUser(payerId);
         List<User> participants = new ArrayList<>();
@@ -47,7 +47,7 @@ public class ExpenseService {
         Map<User, Double> shares = split.calculateSplit(amount, participants, processedSplitDetails);
         
         String expenseId = UUID.randomUUID().toString();
-        Expense expense = new Expense(expenseId, title, splitType, amount, payer, participants, shares, splitDetails, LocalDateTime.now());
+        Expense expense = new Expense(expenseId, title, splitType, amount, payer, participants, shares, splitDetails, LocalDateTime.now(), isSettleUp);
         expense.setDescription(description);
         
         expenseManager.addExpense(expense);
@@ -57,7 +57,7 @@ public class ExpenseService {
     // Add expense to a group
     public Expense addGroupExpense(String title, String description, double amount,
                                   String payerId, String groupId,
-                                  SplitTypes splitType, Map<String, Object> splitDetails) {
+                                  SplitTypes splitType, Map<String, Object> splitDetails, Boolean isSettleUp) {
         
         User payer = userService.getUser(payerId);
         Group group = groupService.getGroup(groupId);
@@ -78,7 +78,7 @@ public class ExpenseService {
         Map<User, Double> shares = split.calculateSplit(amount, participants, processedSplitDetails);
         
         String expenseId = UUID.randomUUID().toString();
-        Expense expense = new Expense(expenseId, title, splitType, amount, payer, participants, shares, splitDetails, LocalDateTime.now());
+        Expense expense = new Expense(expenseId, title, splitType, amount, payer, participants, shares, splitDetails, LocalDateTime.now(), isSettleUp);
         expense.setDescription(description);
         expense.setGroup(group);
         
@@ -89,7 +89,7 @@ public class ExpenseService {
     // Add expense to a group with specific participants
     public Expense addGroupExpense(String title, String description, double amount,
                                   String payerId, String groupId, List<String> participantIds,
-                                  SplitTypes splitType, Map<String, Object> splitDetails) {
+                                  SplitTypes splitType, Map<String, Object> splitDetails,Boolean isSettleUp) {
         
         User payer = userService.getUser(payerId);
         Group group = groupService.getGroup(groupId);
@@ -122,7 +122,7 @@ public class ExpenseService {
         Map<User, Double> shares = split.calculateSplit(amount, participants, processedSplitDetails);
         
         String expenseId = UUID.randomUUID().toString();
-        Expense expense = new Expense(expenseId, title, splitType,amount, payer, participants, shares, splitDetails,  LocalDateTime.now());
+        Expense expense = new Expense(expenseId, title, splitType,amount, payer, participants, shares, splitDetails,  LocalDateTime.now(), isSettleUp);
         expense.setDescription(description);
         expense.setGroup(group);
         
@@ -133,7 +133,7 @@ public class ExpenseService {
     // Edit expense between users
     public Expense editExpense(String expenseId, String title, String description, 
                               Double amount, String payerId, List<String> participantIds, 
-                              SplitTypes splitType, Map<String, Object> splitDetails) {
+                              SplitTypes splitType, Map<String, Object> splitDetails, Boolean isSettleUp) {
         
         Expense existingExpense = expenseManager.getExpenseById(expenseId);
         
@@ -172,7 +172,8 @@ public class ExpenseService {
             participants,
             shares,
                 splitDetails,
-            LocalDateTime.now()
+            LocalDateTime.now(),
+                isSettleUp
         );
         
         updatedExpense.setDescription(description != null ? description : existingExpense.getDescription());
@@ -184,26 +185,27 @@ public class ExpenseService {
     
     // Delete expense
     public void deleteExpense(String expenseId) {
-        Expense expenseToDelete = expenseManager.getExpenseById(expenseId);
-        
-        // Create a reverse expense to cancel out the original
-        Expense reverseExpense = new Expense(
-            UUID.randomUUID().toString(),
-            "Reversal of: " + expenseToDelete.getTitle(),
-                expenseToDelete.getSplitType(),
-            -expenseToDelete.getAmount(),
-            expenseToDelete.getPayer(),
-            expenseToDelete.getParticipants(),
-            createReverseShares(expenseToDelete.getShares()),
-                expenseToDelete.getSplitDetails(),
-            LocalDateTime.now()
-        );
-        
-        reverseExpense.setGroup(expenseToDelete.getGroup());
-        expenseManager.addExpense(reverseExpense);
+        //Commenting for now
+//        Expense expenseToDelete = expenseManager.getExpenseById(expenseId);
+//
+//        // Create a reverse expense to cancel out the original
+//        Expense reverseExpense = new Expense(
+//            UUID.randomUUID().toString(),
+//            "Reversal of: " + expenseToDelete.getTitle(),
+//                expenseToDelete.getSplitType(),
+//            -expenseToDelete.getAmount(),
+//            expenseToDelete.getPayer(),
+//            expenseToDelete.getParticipants(),
+//            createReverseShares(expenseToDelete.getShares()),
+//                expenseToDelete.getSplitDetails(),
+//            LocalDateTime.now()
+//        );
+//
+//        reverseExpense.setGroup(expenseToDelete.getGroup());
+//        expenseManager.addExpense(reverseExpense);
         
         // Optionally, you can also delete the original expense from the database
-        // expenseManager.deleteExpense(expenseId);
+         expenseManager.deleteExpense(expenseId);
     }
     
     private Map<User, Double> createReverseShares(Map<User, Double> originalShares) {

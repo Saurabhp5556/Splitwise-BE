@@ -43,7 +43,7 @@ public class SplitwiseApplicationTests {
         Map<String, Object> splitDetails = new HashMap<>();
         Map<User, Double> dinnerShares = equalSplit.calculateSplit(1200.0, dinnerParticipants, splitDetails);
 
-        Expense dinnerExpense = new Expense("e1", "Dinner @ Bhandara",SplitTypes.EQUAL_SPLIT, 1200.0, ram, dinnerParticipants, dinnerShares, splitDetails, LocalDateTime.now());
+        Expense dinnerExpense = new Expense("e1", "Dinner @ Bhandara",SplitTypes.EQUAL_SPLIT, 1200.0, ram, dinnerParticipants, dinnerShares, splitDetails, LocalDateTime.now(),false);
 
         expenseManager.addExpense(dinnerExpense);
 
@@ -82,7 +82,7 @@ public class SplitwiseApplicationTests {
         Split percentageSplit = SplitFactory.createSplit(SplitTypes.SPLIT_BY_PERCENTAGES);
         Map<User, Double> movieShares = percentageSplit.calculateSplit(800.0, movieParticipants, movieSplitDetails);
 
-        Expense movieExpense = new Expense("e2", "Movie",SplitTypes.SPLIT_BY_PERCENTAGES, 800.0, bob, movieParticipants, movieShares,movieSplitDetails,  LocalDateTime.now());
+        Expense movieExpense = new Expense("e2", "Movie",SplitTypes.SPLIT_BY_PERCENTAGES, 800.0, bob, movieParticipants, movieShares,movieSplitDetails,  LocalDateTime.now(),false);
 
         expenseManager.addExpense(movieExpense);
 
