@@ -53,7 +53,8 @@ public class ExpenseController {
         @SuppressWarnings("unchecked")
         List<String> participantIds = (List<String>) request.get("participantIds");
         String splitTypeStr = (String) request.get("splitType");
-        
+        Boolean isSettleUp = (Boolean) request.get("isSettleUp");
+
         SplitTypes splitType;
         try {
             splitType = SplitTypes.valueOf(splitTypeStr);
@@ -66,7 +67,7 @@ public class ExpenseController {
             (Map<String, Object>) request.get("splitDetails") : new HashMap<>();
 
         Expense expense = expenseService.addExpense(title, description, amount, payerId, 
-                                                  participantIds, splitType, splitDetails);
+                                                  participantIds, splitType, splitDetails, isSettleUp);
         logger.info("Successfully created expense with ID: {}", expense.getId());
         return ResponseEntity.status(HttpStatus.CREATED).body(expense);
     }
@@ -84,7 +85,8 @@ public class ExpenseController {
         String payerId = (String) request.get("payerId");
         String groupId = request.get("groupId").toString();
         String splitTypeStr = (String) request.get("splitType");
-        
+        Boolean isSettleUp = (Boolean) request.get("isSettleUp");
+
         SplitTypes splitType;
         try {
             splitType = SplitTypes.valueOf(splitTypeStr);
@@ -101,7 +103,7 @@ public class ExpenseController {
             (Map<String, Object>) request.get("splitDetails") : new HashMap<>();
 
         Expense expense = expenseService.addGroupExpense(title, description, amount, payerId, 
-                                                       groupId, participantIds, splitType, splitDetails);
+                                                       groupId, participantIds, splitType, splitDetails,isSettleUp);
         logger.info("Successfully created group expense with ID: {}", expense.getId());
         return ResponseEntity.status(HttpStatus.CREATED).body(expense);
     }
@@ -116,7 +118,8 @@ public class ExpenseController {
         Double amount = request.containsKey("amount") ? 
             Double.parseDouble(request.get("amount").toString()) : null;
         String payerId = (String) request.get("payerId");
-        
+        Boolean isSettleUp = (Boolean) request.get("isSettleUp");
+
         @SuppressWarnings("unchecked")
         List<String> participantIds = request.containsKey("participantIds") ? 
             (List<String>) request.get("participantIds") : null;
@@ -136,7 +139,7 @@ public class ExpenseController {
             (Map<String, Object>) request.get("splitDetails") : null;
 
         Expense expense = expenseService.editExpense(expenseId, title, description, amount, 
-                                                  payerId, participantIds, splitType, splitDetails);
+                                                  payerId, participantIds, splitType, splitDetails,isSettleUp);
         logger.info("Successfully updated expense with ID: {}", expenseId);
         return ResponseEntity.ok(expense);
     }

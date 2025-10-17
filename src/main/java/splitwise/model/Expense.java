@@ -75,7 +75,10 @@ public class Expense {
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private Group group;
 
-    public Expense(String id, String title, SplitTypes splitType,double amount, User payer, List<User> participants, Map<User, Double> shares, Map<String, Object> splitDetails, LocalDateTime timestamp) {
+    @Column(name = "is_settle_up")
+    private Boolean isSettleUp;
+
+    public Expense(String id, String title, SplitTypes splitType,double amount, User payer, List<User> participants, Map<User, Double> shares, Map<String, Object> splitDetails, LocalDateTime timestamp,Boolean isSettleUp) {
         this.id = id;
         this.title = title;
         this.amount = amount;
@@ -85,6 +88,7 @@ public class Expense {
         this.shares = shares;
         this.splitDetails = splitDetails;
         this.timestamp = timestamp;
+        this.isSettleUp = isSettleUp;
     }
     
     @JsonGetter("shares")
