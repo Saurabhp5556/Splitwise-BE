@@ -27,6 +27,9 @@ public class ExpenseService {
     
     @Autowired
     private ExpenseRepository expenseRepository;
+    
+    @Autowired
+    private BalanceSheet balanceSheet;
 
     // Add expense between two users (or more)
     public Expense addExpense(String title, String description, double amount, 
@@ -182,38 +185,25 @@ public class ExpenseService {
         return updatedExpense;
     }
     
-    // Delete expense
+    /**
+     * Deletes an expense and reverses its impact on user balances.
+     *
+     * This method:
+     * 1. Directly reverses the balance changes using BalanceSheet.reverseBalances()
+     * 2. Deletes the expense from the database
+     *
+     * This is much simpler than creating temporary reverse expenses!
+     *
+     * @param expenseId The ID of the expense to delete
+     */
     public void deleteExpense(String expenseId) {
         Expense expenseToDelete = expenseManager.getExpenseById(expenseId);
         
-        // Create a reverse expense to cancel out the original
-        Expense reverseExpense = new Expense(
-            UUID.randomUUID().toString(),
-            "Reversal of: " + expenseToDelete.getTitle(),
-                expenseToDelete.getSplitType(),
-            -expenseToDelete.getAmount(),
-            expenseToDelete.getPayer(),
-            expenseToDelete.getParticipants(),
-            createReverseShares(expenseToDelete.getShares()),
-                expenseToDelete.getSplitDetails(),
-            LocalDateTime.now()
-        );
+        // Directly reverse the balance changes - much simpler!
+        balanceSheet.reverseBalances(expenseToDelete);
         
-        reverseExpense.setGroup(expenseToDelete.getGroup());
-        expenseManager.addExpense(reverseExpense);
-        
-        // Optionally, you can also delete the original expense from the database
-        // expenseManager.deleteExpense(expenseId);
-    }
-    
-    private Map<User, Double> createReverseShares(Map<User, Double> originalShares) {
-        Map<User, Double> reverseShares = new HashMap<>();
-        
-        for (Map.Entry<User, Double> entry : originalShares.entrySet()) {
-            reverseShares.put(entry.getKey(), -entry.getValue());
-        }
-        
-        return reverseShares;
+        // Delete the expense from the database
+        expenseManager.deleteExpense(expenseId);
     }
     
     // Get all expenses

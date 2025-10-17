@@ -120,6 +120,50 @@ public class BalanceSheet implements ExpenseObserver {
     }
 
     /**
+     * Reverses the balance changes caused by an expense.
+     * This is used when deleting expenses to undo their impact on user balances.
+     *
+     * @param expense The expense whose balance changes should be reversed
+     */
+    public void reverseBalances(Expense expense) {
+        User payer = expense.getPayer();
+        Map<User, Double> shares = expense.getShares();
+
+        for (Map.Entry<User, Double> entry : shares.entrySet()) {
+            User participant = entry.getKey();
+            Double amount = entry.getValue();
+
+            // Skip the payer - they don't owe themselves
+            if (!participant.equals(payer)) {
+                // Reverse the balance by subtracting the amount
+                reverseUserPairBalance(participant, payer, amount);
+            }
+        }
+    }
+
+    /**
+     * Reverses a UserPair balance by subtracting the specified amount.
+     */
+    private void reverseUserPairBalance(User debtor, User creditor, Double amount) {
+        Optional<UserPair> existingPair = userPairRepository.findByUser1AndUser2(debtor, creditor);
+        
+        if (existingPair.isPresent()) {
+            UserPair pair = existingPair.get();
+            double newBalance = pair.getBalance() - amount;
+            
+            // If balance becomes zero or very close to zero, delete the UserPair
+            if (Math.abs(newBalance) < 0.001) {
+                userPairRepository.delete(pair);
+            } else {
+                pair.setBalance(newBalance);
+                userPairRepository.save(pair);
+            }
+        }
+        // If no existing pair found, this means the balance was already zero
+        // No action needed for reversal
+    }
+
+    /**
      * Calculates the net balance for each user across all their relationships.
      * Positive balance means the user is owed money, negative means they owe money.
      */
