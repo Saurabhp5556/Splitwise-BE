@@ -108,8 +108,19 @@ public class BalanceSheet {
 
     @Cacheable(value = "balances", key = "#u1.userId + '_' + #u2.userId")
     public double getBalance(User u1, User u2) {
+        // Check if u1 owes u2 (u1 is user1, u2 is user2)
         Optional<UserPair> pair = userPairRepository.findByUser1AndUser2(u1, u2);
-        return pair.isPresent() ? pair.get().getBalance() : 0.0;
+        if (pair.isPresent()) {
+            return -pair.get().getBalance(); // Negative because u1 owes u2
+        }
+        
+        // Check if u2 owes u1 (u2 is user1, u1 is user2)
+        Optional<UserPair> reversePair = userPairRepository.findByUser1AndUser2(u2, u1);
+        if (reversePair.isPresent()) {
+            return reversePair.get().getBalance(); // Positive because u2 owes u1
+        }
+        
+        return 0.0;
     }
 
     public double getTotalBalance(User user) {
