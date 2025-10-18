@@ -1,7 +1,10 @@
 package splitwise.service;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import splitwise.model.Group;
 import splitwise.model.User;
 import splitwise.repository.GroupRepository;
@@ -22,6 +25,7 @@ public class UserService {
     @Autowired
     private BalanceSheet balanceSheet;
     
+    @Transactional
     public User createUser(String id, String name, String email, String mobile) {
         if (userRepository.existsById(id)) {
             throw new IllegalArgumentException("User with ID " + id + " already exists");
@@ -32,6 +36,7 @@ public class UserService {
         return userRepository.save(user);
     }
     
+    @Cacheable(value = "users", key = "#id")
     public User getUser(String id) {
         return userRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("User with ID " + id + " not found"));
@@ -41,6 +46,8 @@ public class UserService {
         return userRepository.findAll();
     }
     
+    @Transactional
+    @CacheEvict(value = "users", key = "#id")
     public void deleteUser(String id) {
         if (!userRepository.existsById(id)) {
             throw new IllegalArgumentException("User with ID " + id + " not found");
@@ -80,6 +87,8 @@ public class UserService {
         }
     }
     
+    @Transactional
+    @CacheEvict(value = "users", key = "#id")
     public User updateUser(String id, String name, String email, String mobile) {
         User user = getUser(id);
         

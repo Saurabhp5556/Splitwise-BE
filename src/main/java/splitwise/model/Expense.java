@@ -17,7 +17,11 @@ import java.util.List;
 import java.util.Map;
 
 @Entity
-@Table(name = "expenses")
+@Table(name = "expenses", indexes = {
+    @Index(name = "idx_expense_payer", columnList = "payer_id"),
+    @Index(name = "idx_expense_group", columnList = "group_id"),
+    @Index(name = "idx_expense_timestamp", columnList = "timestamp")
+})
 @Getter
 @Setter
 @NoArgsConstructor
@@ -74,8 +78,14 @@ public class Expense {
     @JoinColumn(name = "group_id")
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private Group group;
+    
+    @Column(name = "is_settle_up")
+    private Boolean isSettleUp;
+    
+    @Version
+    private Long version;
 
-    public Expense(String id, String title, SplitTypes splitType,double amount, User payer, List<User> participants, Map<User, Double> shares, Map<String, Object> splitDetails, LocalDateTime timestamp) {
+    public Expense(String id, String title, SplitTypes splitType,double amount, User payer, List<User> participants, Map<User, Double> shares, Map<String, Object> splitDetails, LocalDateTime timestamp, Boolean isSettleUp) {
         this.id = id;
         this.title = title;
         this.amount = amount;
@@ -85,6 +95,7 @@ public class Expense {
         this.shares = shares;
         this.splitDetails = splitDetails;
         this.timestamp = timestamp;
+        this.isSettleUp = isSettleUp;
     }
     
     @JsonGetter("shares")

@@ -10,7 +10,12 @@ import java.util.Objects;
 
 @Entity
 @Table(name = "user_pairs",
-       uniqueConstraints = @UniqueConstraint(columnNames = {"user1_id", "user2_id"}))
+       uniqueConstraints = @UniqueConstraint(columnNames = {"user1_id", "user2_id"}),
+       indexes = {
+           @Index(name = "idx_user_pair", columnList = "user1_id,user2_id", unique = true),
+           @Index(name = "idx_user1", columnList = "user1_id"),
+           @Index(name = "idx_user2", columnList = "user2_id")
+       })
 @Getter
 @Setter
 @NoArgsConstructor
@@ -33,6 +38,9 @@ public class UserPair {
     
     @Column(nullable = false)
     private Double balance = 0.0;
+    
+    @Version
+    private Long version;
 
     public UserPair(User u1, User u2) {
         this.user1 = u1;

@@ -1,16 +1,19 @@
 package splitwise.service;
 
-import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Lazy;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import splitwise.event.ExpenseAddedEvent;
+import splitwise.event.ExpenseUpdatedEvent;
 import splitwise.model.Expense;
 import splitwise.model.Transaction;
 import splitwise.model.User;
 import splitwise.model.UserPair;
 import splitwise.repository.TransactionRepository;
 import splitwise.repository.UserPairRepository;
-import splitwise.util.ExpenseObserver;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -33,7 +36,7 @@ import java.util.Optional;
  * - Net Balance: Overall amount a user owes or is owed across all relationships
  */
 @Service
-public class BalanceSheet implements ExpenseObserver {
+public class BalanceSheet {
 
     @Autowired
     private UserPairRepository userPairRepository;
@@ -41,23 +44,24 @@ public class BalanceSheet implements ExpenseObserver {
     @Autowired
     private TransactionRepository transactionRepository;
     
-    @Autowired
-    @Lazy
-    private ExpenseManager expenseManager;
-    
-    @PostConstruct
-    public void init() {
-        expenseManager.addObserver(this);
+    /**
+     * Event listener for expense added events.
+     * Automatically updates balances when a new expense is created.
+     */
+    @EventListener
+    @Transactional
+    public void handleExpenseAdded(ExpenseAddedEvent event) {
+        updateBalances(event.getExpense());
     }
 
-    @Override
-    public void onExpenseAdded(Expense expense) {
-        updateBalances(expense);
-    }
-
-    @Override
-    public void onExpenseUpdated(Expense expense) {
-        updateBalances(expense);
+    /**
+     * Event listener for expense updated events.
+     * Automatically updates balances when an expense is modified.
+     */
+    @EventListener
+    @Transactional
+    public void handleExpenseUpdated(ExpenseUpdatedEvent event) {
+        updateBalances(event.getExpense());
     }
 
     /**
@@ -65,7 +69,8 @@ public class BalanceSheet implements ExpenseObserver {
      * For each participant who didn't pay, creates or updates a UserPair record
      * indicating how much they owe the payer.
      */
-    private void updateBalances(Expense expense) {
+    @Transactional
+    public void updateBalances(Expense expense) {
         User payer = expense.getPayer();
         Map<User, Double> shares = expense.getShares();
 
@@ -83,7 +88,9 @@ public class BalanceSheet implements ExpenseObserver {
     /**
      * Updates or creates a UserPair record for the balance between two users.
      */
-    private void updateUserPairBalance(User debtor, User creditor, Double amount) {
+    @Transactional
+    @CacheEvict(value = "balances", allEntries = true)
+    public void updateUserPairBalance(User debtor, User creditor, Double amount) {
         Optional<UserPair> existingPair = userPairRepository.findByUser1AndUser2(debtor, creditor);
         
         if (existingPair.isPresent()) {
@@ -99,6 +106,7 @@ public class BalanceSheet implements ExpenseObserver {
         }
     }
 
+    @Cacheable(value = "balances", key = "#u1.userId + '_' + #u2.userId")
     public double getBalance(User u1, User u2) {
         Optional<UserPair> pair = userPairRepository.findByUser1AndUser2(u1, u2);
         return pair.isPresent() ? pair.get().getBalance() : 0.0;
@@ -117,6 +125,53 @@ public class BalanceSheet implements ExpenseObserver {
         }
 
         return total;
+    }
+
+    /**
+     * Reverses the balance changes caused by an expense.
+     * This is used when deleting expenses to undo their impact on user balances.
+     *
+     * @param expense The expense whose balance changes should be reversed
+     */
+    @Transactional
+    @CacheEvict(value = "balances", allEntries = true)
+    public void reverseBalances(Expense expense) {
+        User payer = expense.getPayer();
+        Map<User, Double> shares = expense.getShares();
+
+        for (Map.Entry<User, Double> entry : shares.entrySet()) {
+            User participant = entry.getKey();
+            Double amount = entry.getValue();
+
+            // Skip the payer - they don't owe themselves
+            if (!participant.equals(payer)) {
+                // Reverse the balance by subtracting the amount
+                reverseUserPairBalance(participant, payer, amount);
+            }
+        }
+    }
+
+    /**
+     * Reverses a UserPair balance by subtracting the specified amount.
+     */
+    @Transactional
+    public void reverseUserPairBalance(User debtor, User creditor, Double amount) {
+        Optional<UserPair> existingPair = userPairRepository.findByUser1AndUser2(debtor, creditor);
+        
+        if (existingPair.isPresent()) {
+            UserPair pair = existingPair.get();
+            double newBalance = pair.getBalance() - amount;
+            
+            // If balance becomes zero or very close to zero, delete the UserPair
+            if (Math.abs(newBalance) < 0.001) {
+                userPairRepository.delete(pair);
+            } else {
+                pair.setBalance(newBalance);
+                userPairRepository.save(pair);
+            }
+        }
+        // If no existing pair found, this means the balance was already zero
+        // No action needed for reversal
     }
 
     /**
@@ -143,6 +198,7 @@ public class BalanceSheet implements ExpenseObserver {
      * Calculates simplified settlements to minimize the number of transactions needed
      * to settle all balances between users.
      */
+    @Transactional
     public List<Transaction> getSimplifiedSettlements() {
         Map<User, Double> netBalances = calculateNetBalances();
 
@@ -186,6 +242,100 @@ public class BalanceSheet implements ExpenseObserver {
             }
         }
         return transactions;
+    }
+
+    /**
+     * Optimized settlement calculation using greedy algorithm
+     * Time Complexity: O(n log n)
+     * Space Complexity: O(n)
+     *
+     * This replaces the inefficient O(n!) recursive algorithm with a greedy approach
+     * that achieves near-optimal results in linear-logarithmic time.
+     */
+    @Transactional
+    public List<Transaction> getOptimizedSettlements() {
+        Map<User, Double> netBalances = calculateNetBalancesOptimized();
+
+        // Separate creditors and debtors using priority queues
+        java.util.PriorityQueue<UserBalance> creditors = new java.util.PriorityQueue<>((a, b) ->
+            Double.compare(b.amount, a.amount)); // Max heap
+        java.util.PriorityQueue<UserBalance> debtors = new java.util.PriorityQueue<>((a, b) ->
+            Double.compare(b.amount, a.amount)); // Max heap (absolute values)
+
+        for (Map.Entry<User, Double> entry : netBalances.entrySet()) {
+            double balance = entry.getValue();
+            if (balance > 0.01) { // User is owed money
+                creditors.offer(new UserBalance(entry.getKey(), balance));
+            } else if (balance < -0.01) { // User owes money
+                debtors.offer(new UserBalance(entry.getKey(), -balance));
+            }
+        }
+
+        List<Transaction> settlements = new ArrayList<>();
+
+        // Greedy matching: always match highest debtor with highest creditor
+        while (!creditors.isEmpty() && !debtors.isEmpty()) {
+            UserBalance creditor = creditors.poll();
+            UserBalance debtor = debtors.poll();
+
+            double settlementAmount = Math.min(creditor.amount, debtor.amount);
+
+            Transaction transaction = new Transaction(
+                debtor.user,    // from
+                creditor.user,  // to
+                settlementAmount
+            );
+            transaction = transactionRepository.save(transaction);
+            settlements.add(transaction);
+
+            // Add back remaining balance if any
+            if (creditor.amount - settlementAmount > 0.01) {
+                creditor.amount -= settlementAmount;
+                creditors.offer(creditor);
+            }
+            if (debtor.amount - settlementAmount > 0.01) {
+                debtor.amount -= settlementAmount;
+                debtors.offer(debtor);
+            }
+        }
+
+        return settlements;
+    }
+
+    /**
+     * Calculate net balance for each user using optimized query with aggregation
+     */
+    private Map<User, Double> calculateNetBalancesOptimized() {
+        Map<User, Double> netBalances = new HashMap<>();
+
+        // Use single query with aggregation instead of loading all pairs
+        List<Object[]> balanceSums = userPairRepository.getNetBalances();
+
+        for (Object[] row : balanceSums) {
+            User user = (User) row[0];
+            Double owedAmount = (Double) row[1];  // What others owe this user
+            Double owesAmount = (Double) row[2];  // What this user owes others
+
+            double netBalance = (owedAmount != null ? owedAmount : 0.0) -
+                               (owesAmount != null ? owesAmount : 0.0);
+
+            if (Math.abs(netBalance) > 0.01) { // Ignore tiny amounts
+                netBalances.put(user, netBalance);
+            }
+        }
+
+        return netBalances;
+    }
+
+    // Helper class for priority queue
+    private static class UserBalance {
+        User user;
+        double amount;
+
+        UserBalance(User user, double amount) {
+            this.user = user;
+            this.amount = amount;
+        }
     }
 
     /**

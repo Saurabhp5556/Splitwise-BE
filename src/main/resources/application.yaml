@@ -7,6 +7,14 @@ spring:
     username: splitwise_user
     password: splitwise_password
     driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      idle-timeout: 300000
+      connection-timeout: 20000
+      max-lifetime: 1200000
+      leak-detection-threshold: 60000
+  
   jpa:
     hibernate:
       ddl-auto: update
@@ -14,7 +22,31 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: false
+        connection:
+          isolation: 2  # READ_COMMITTED
     show-sql: false
+  
+  # Redis configuration - DISABLED
+  # Uncomment to enable Redis caching
+  #redis:
+  #  host: localhost
+  #  port: 6379
+  #  timeout: 2000ms
+  #  jedis:
+  #    pool:
+  #      max-active: 8
+  #      max-idle: 8
+  #      min-idle: 0
+  #      max-wait: -1ms
+  
+  # Cache configuration - Using simple in-memory cache
+  cache:
+    type: simple
+    cache-names: balances,users,groups,expenses
+  #  type: redis  # Uncomment for Redis
+  #  redis:
+  #    time-to-live: 600000  # 10 minutes
+  #    cache-null-values: false
   
   # Jackson configuration for Hibernate
   jackson:
@@ -27,6 +59,12 @@ spring:
   # Application name
   application:
     name: splitwise-application
+
+# JWT configuration
+jwt:
+  secret: Y3lUQ2hOZ2pKZ3d0UjV0VXZjZk1iYll3RXdtYUx0d3Q=
+  access-token-expiration: 86400000  # 24 hours in milliseconds
+  refresh-token-expiration: 31536000000  # 365 days (1 year) in milliseconds
 
 # Logging configuration
 logging:

@@ -4,22 +4,43 @@ services:
   postgres:
     image: postgres:14-alpine
     container_name: splitwise-postgres
-    ports:
-      - "5432:5432"
     environment:
-      POSTGRES_DB: splitwise
       POSTGRES_USER: splitwise_user
       POSTGRES_PASSWORD: splitwise_password
+      POSTGRES_DB: splitwise
+    ports:
+      - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-    restart: unless-stopped
+      - splitwise-postgres-data:/var/lib/postgresql/data
     networks:
       - splitwise-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U splitwise_user -d splitwise"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis - DISABLED (using in-memory cache instead)
+  #redis:
+  #  image: redis:7-alpine
+  #  container_name: splitwise-redis
+  #  ports:
+  #    - "6379:6379"
+  #  volumes:
+  #    - splitwise-redis-data:/data
+  #  networks:
+  #    - splitwise-network
+  #  command: redis-server --appendonly yes
+  #  healthcheck:
+  #    test: ["CMD", "redis-cli", "ping"]
+  #    interval: 10s
+  #    timeout: 5s
+  #    retries: 5
 
 volumes:
-  postgres_data:
-    name: splitwise-postgres-data
+  splitwise-postgres-data:
+  #splitwise-redis-data:  # Uncomment if using Redis
 
 networks:
   splitwise-network:
-    name: splitwise-network
+    driver: bridge
