@@ -99,13 +99,12 @@ public class DashboardService {
             totalBalance += groupBalance;
         }
         
-        // Calculate overall balance including both group and non-group expenses
+        // Use BalanceSheet to get the correct overall balance from UserPair table
         double overallBalance = balanceSheet.getTotalBalance(user);
         
         Map<String, Object> result = new HashMap<>();
         result.put("groups", groupsWithBalances);
-        result.put("groupsBalance", totalBalance);  // Balance from group expenses only
-        result.put("totalBalance", overallBalance);  // Overall balance including all expenses
+        result.put("totalBalance", overallBalance);  // Overall balance from UserPair table
         
         // Add descriptive information for overall balance
         if (overallBalance > 0) {
@@ -123,7 +122,180 @@ public class DashboardService {
     }
     
     /**
-     * Get all users with whom the current user has balances
+     * Get all friends with aggregated balance breakdown across groups and non-group expenses
+     * Uses UserPair table for accurate balance calculation and properly categorizes expenses
+     */
+    public Map<String, Object> getUserFriendsWithTransactions(String userId) {
+        User user = userService.getUser(userId);
+        List<UserPair> userPairs = userPairRepository.findByUser(user);
+        
+        // Map to store friend data: friendUserId -> friend data
+        Map<String, Map<String, Object>> friendsMap = new HashMap<>();
+        
+        // Build friend map from UserPair (this has the correct total balances)
+        for (UserPair pair : userPairs) {
+            User friend;
+            double totalBalance;
+            
+            if (pair.getUser1().equals(user)) {
+                friend = pair.getUser2();
+                totalBalance = -pair.getBalance(); // Negative because user1 owes user2
+            } else {
+                friend = pair.getUser1();
+                totalBalance = pair.getBalance(); // Positive because user2 owes user1
+            }
+            
+            // Skip if balance is essentially zero
+            if (Math.abs(totalBalance) < 0.01) {
+                continue;
+            }
+            
+            Map<String, Object> friendData = new HashMap<>();
+            friendData.put("name", friend.getName());
+            friendData.put("userId", friend.getUserId());
+            friendData.put("totalBalance", totalBalance);
+            friendData.put("groupBalances", new HashMap<String, Double>());
+            friendData.put("nonGroupBalance", 0.0);
+            
+            friendsMap.put(friend.getUserId(), friendData);
+        }
+        
+        // Get ALL expenses involving this user to properly categorize them
+        List<Expense> allExpenses = expenseRepository.findByParticipantId(userId);
+        
+        // Process each expense and categorize by group or non-group
+        for (Expense expense : allExpenses) {
+            User payer = expense.getPayer();
+            Map<User, Double> shares = expense.getShares();
+            Group group = expense.getGroup();
+            
+            // Determine the friend and balance for this expense
+            User friend = null;
+            double balance = 0.0;
+            
+            if (payer.equals(user)) {
+                // Current user is payer, find who owes them
+                for (Map.Entry<User, Double> entry : shares.entrySet()) {
+                    if (!entry.getKey().equals(user)) {
+                        friend = entry.getKey();
+                        balance = entry.getValue(); // Positive: they owe user
+                        break;
+                    }
+                }
+            } else if (shares.containsKey(user)) {
+                // Current user owes the payer
+                friend = payer;
+                balance = -shares.get(user); // Negative: user owes them
+            }
+            
+            // If we found a friend relationship in this expense
+            if (friend != null && Math.abs(balance) >= 0.01) {
+                Map<String, Object> friendData = friendsMap.get(friend.getUserId());
+                if (friendData != null) {
+                    @SuppressWarnings("unchecked")
+                    Map<String, Double> friendGroupBalances = (Map<String, Double>) friendData.get("groupBalances");
+                    
+                    if (group != null) {
+                        // This is a group expense - add to group balances
+                        String groupName = group.getName();
+                        friendGroupBalances.put(groupName,
+                            friendGroupBalances.getOrDefault(groupName, 0.0) + balance);
+                    } else {
+                        // This is a non-group expense - add to non-group balance
+                        double currentNonGroupBalance = (double) friendData.get("nonGroupBalance");
+                        friendData.put("nonGroupBalance", currentNonGroupBalance + balance);
+                    }
+                }
+            }
+        }
+        
+        // Convert map to list and build transaction list from aggregated data
+        List<Map<String, Object>> friendsList = new ArrayList<>();
+        double overallBalance = 0.0;
+        
+        for (Map<String, Object> friendData : friendsMap.values()) {
+            // Recalculate total balance from actual transactions to ensure accuracy
+            @SuppressWarnings("unchecked")
+            Map<String, Double> friendGroupBalances = (Map<String, Double>) friendData.get("groupBalances");
+            double nonGroupBalance = (double) friendData.get("nonGroupBalance");
+            
+            // Calculate actual total from group and non-group balances
+            double calculatedTotal = nonGroupBalance;
+            for (double groupBalance : friendGroupBalances.values()) {
+                calculatedTotal += groupBalance;
+            }
+            
+            // Use calculated total instead of UserPair total for accuracy
+            double totalBalance = calculatedTotal;
+            friendData.put("totalBalance", totalBalance);
+            
+            // Build transactions list from aggregated data
+            List<Map<String, Object>> transactions = new ArrayList<>();
+            
+            // Add group transactions
+            for (Map.Entry<String, Double> groupEntry : friendGroupBalances.entrySet()) {
+                double groupBalance = groupEntry.getValue();
+                if (Math.abs(groupBalance) >= 0.01) {
+                    Map<String, Object> transaction = new HashMap<>();
+                    transaction.put("type", "group");
+                    transaction.put("balance", Math.abs(groupBalance));
+                    transaction.put("balanceType", groupBalance > 0 ? "gets_back" : "owes");
+                    transaction.put("name", groupEntry.getKey());
+                    transactions.add(transaction);
+                }
+            }
+            
+            // Add non-group transaction if exists
+            if (Math.abs(nonGroupBalance) >= 0.01) {
+                Map<String, Object> transaction = new HashMap<>();
+                transaction.put("type", "non-group");
+                transaction.put("balance", Math.abs(nonGroupBalance));
+                transaction.put("balanceType", nonGroupBalance > 0 ? "gets_back" : "owes");
+                transaction.put("name", null);
+                transactions.add(transaction);
+            }
+            
+            friendData.put("transactions", transactions);
+            
+            // Remove temporary aggregation maps
+            friendData.remove("groupBalances");
+            friendData.remove("nonGroupBalance");
+            
+            // Add balance type for the friend
+            if (totalBalance > 0) {
+                friendData.put("balanceType", "gets_back");
+            } else if (totalBalance < 0) {
+                friendData.put("balanceType", "owes");
+                friendData.put("totalBalance", Math.abs(totalBalance));
+            } else {
+                friendData.put("balanceType", "settled");
+            }
+            
+            friendsList.add(friendData);
+            overallBalance += totalBalance;
+        }
+        
+        // Build result
+        Map<String, Object> result = new HashMap<>();
+        result.put("users", friendsList);
+        result.put("totalBalance", overallBalance);
+        
+        if (overallBalance > 0) {
+            result.put("balanceType", "gets_back");
+            result.put("description", "You get back overall");
+        } else if (overallBalance < 0) {
+            result.put("balanceType", "owes");
+            result.put("description", "You owe overall");
+        } else {
+            result.put("balanceType", "settled");
+            result.put("description", "All settled");
+        }
+        
+        return result;
+    }
+    
+    /**
+     * Get all users with whom the current user has balances (legacy method)
      */
     public Map<String, Object> getUserBalances(String userId) {
         User user = userService.getUser(userId);
