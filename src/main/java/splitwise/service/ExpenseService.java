@@ -1,7 +1,10 @@
 package splitwise.service;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import splitwise.model.Expense;
 import splitwise.model.Group;
 import splitwise.model.User;
@@ -32,9 +35,19 @@ public class ExpenseService {
     private BalanceSheet balanceSheet;
 
     // Add expense between two users (or more)
-    public Expense addExpense(String title, String description, double amount, 
-                             String payerId, List<String> participantIds, 
-                             SplitTypes splitType, Map<String, Object> splitDetails) {
+    @Transactional
+    public Expense addExpense(String title, String description, double amount,
+                             String payerId, List<String> participantIds,
+                             SplitTypes splitType, Map<String, Object> splitDetails, Boolean isSettleUp) {
+        
+        // Get the currently authenticated user
+        String currentUserId = getCurrentUserId();
+        
+        // Validate that the current user is either the payer or one of the participants
+        validateUserAuthorization(currentUserId, payerId, participantIds);
+        
+        // Validate that required split details are provided based on split type
+        validateSplitDetails(splitType, splitDetails, participantIds);
         
         User payer = userService.getUser(payerId);
         List<User> participants = new ArrayList<>();
@@ -50,53 +63,37 @@ public class ExpenseService {
         Map<User, Double> shares = split.calculateSplit(amount, participants, processedSplitDetails);
         
         String expenseId = UUID.randomUUID().toString();
-        Expense expense = new Expense(expenseId, title, splitType, amount, payer, participants, shares, splitDetails, LocalDateTime.now());
+        Expense expense = new Expense(expenseId, title, splitType, amount, payer, participants, shares, splitDetails, LocalDateTime.now(), isSettleUp);
         expense.setDescription(description);
-        
-        expenseManager.addExpense(expense);
-        return expense;
-    }
-    
-    // Add expense to a group
-    public Expense addGroupExpense(String title, String description, double amount,
-                                  String payerId, String groupId,
-                                  SplitTypes splitType, Map<String, Object> splitDetails) {
-        
-        User payer = userService.getUser(payerId);
-        Group group = groupService.getGroup(groupId);
-        List<User> groupMembers = group.getUserList();
-        
-        // Use all group members as participants by default
-        List<User> participants = new ArrayList<>(groupMembers);
-        
-        // Ensure payer is part of the group
-        if (!groupMembers.contains(payer)) {
-            throw new IllegalArgumentException("Payer must be a member of the group");
-        }
-        
-        // Convert user IDs to User objects in split details if needed
-        Map<String, Object> processedSplitDetails = processSplitDetails(splitDetails, splitType);
-        
-        Split split = SplitFactory.createSplit(splitType);
-        Map<User, Double> shares = split.calculateSplit(amount, participants, processedSplitDetails);
-        
-        String expenseId = UUID.randomUUID().toString();
-        Expense expense = new Expense(expenseId, title, splitType, amount, payer, participants, shares, splitDetails, LocalDateTime.now());
-        expense.setDescription(description);
-        expense.setGroup(group);
         
         expenseManager.addExpense(expense);
         return expense;
     }
     
     // Add expense to a group with specific participants
+    @Transactional
     public Expense addGroupExpense(String title, String description, double amount,
                                   String payerId, String groupId, List<String> participantIds,
-                                  SplitTypes splitType, Map<String, Object> splitDetails) {
+                                  SplitTypes splitType, Map<String, Object> splitDetails, Boolean isSettleUp) {
+        
+        // Get the currently authenticated user
+        String currentUserId = getCurrentUserId();
         
         User payer = userService.getUser(payerId);
         Group group = groupService.getGroup(groupId);
         List<User> groupMembers = group.getUserList();
+        
+        // Ensure current user is a member of the group
+        User currentUser = userService.getUser(currentUserId);
+        if (!groupMembers.contains(currentUser)) {
+            throw new IllegalArgumentException("You must be a member of the group to add expenses");
+        }
+        
+        // Validate that required split details are provided based on split type
+        List<String> finalParticipantIds = (participantIds != null && !participantIds.isEmpty())
+            ? participantIds
+            : groupMembers.stream().map(User::getUserId).toList();
+        validateSplitDetails(splitType, splitDetails, finalParticipantIds);
         
         // Ensure payer is part of the group
         if (!groupMembers.contains(payer)) {
@@ -125,7 +122,7 @@ public class ExpenseService {
         Map<User, Double> shares = split.calculateSplit(amount, participants, processedSplitDetails);
         
         String expenseId = UUID.randomUUID().toString();
-        Expense expense = new Expense(expenseId, title, splitType,amount, payer, participants, shares, splitDetails,  LocalDateTime.now());
+        Expense expense = new Expense(expenseId, title, splitType,amount, payer, participants, shares, splitDetails,  LocalDateTime.now(), isSettleUp);
         expense.setDescription(description);
         expense.setGroup(group);
         
@@ -133,13 +130,24 @@ public class ExpenseService {
         return expense;
     }
     
-    // Edit expense between users
-    public Expense editExpense(String expenseId, String title, String description, 
-                              Double amount, String payerId, List<String> participantIds, 
-                              SplitTypes splitType, Map<String, Object> splitDetails) {
+    /**
+     * Edit expense between users with proper balance reversal.
+     * This method:
+     * 1. Reverses the old expense's balance changes
+     * 2. Updates the expense details
+     * 3. Applies the new balance changes
+     */
+    @Transactional
+    public Expense editExpense(String expenseId, String title, String description,
+                              Double amount, String payerId, List<String> participantIds,
+                              SplitTypes splitType, Map<String, Object> splitDetails, Boolean isSettleUp) {
         
         Expense existingExpense = expenseManager.getExpenseById(expenseId);
         
+        // Step 1: Reverse existing balance changes
+        balanceSheet.reverseBalances(existingExpense);
+        
+        // Step 2: Update expense details
         User payer = payerId != null ? userService.getUser(payerId) : existingExpense.getPayer();
         List<User> participants;
         
@@ -152,36 +160,38 @@ public class ExpenseService {
             participants = existingExpense.getParticipants();
         }
         
+        // Step 3: Recalculate splits
         Map<User, Double> shares;
-        if (splitType != null && amount != null) {
-            // Convert user IDs to User objects in split details if needed
-            Map<String, Object> processedSplitDetails = processSplitDetails(splitDetails, splitType);
-            Split split = SplitFactory.createSplit(splitType);
-            shares = split.calculateSplit(amount, participants, processedSplitDetails);
-        } else if (amount != null) {
-            // Recalculate with existing split type
-            // This is a simplification - in a real app, you'd need to determine the original split type
-            Split split = SplitFactory.createSplit(SplitTypes.EQUAL_SPLIT);
-            shares = split.calculateSplit(amount, participants, new HashMap<>());
+        SplitTypes finalSplitType = splitType != null ? splitType : existingExpense.getSplitType();
+        double finalAmount = amount != null ? amount : existingExpense.getAmount();
+        
+        if (splitType != null || amount != null) {
+            Map<String, Object> processedSplitDetails = processSplitDetails(splitDetails, finalSplitType);
+            Split split = SplitFactory.createSplit(finalSplitType);
+            shares = split.calculateSplit(finalAmount, participants, processedSplitDetails);
         } else {
             shares = existingExpense.getShares();
         }
         
         Expense updatedExpense = new Expense(
             expenseId,
-            title != null ? title : existingExpense.getTitle(), splitType,
-            amount != null ? amount : existingExpense.getAmount(),
+            title != null ? title : existingExpense.getTitle(),
+            finalSplitType,
+            finalAmount,
             payer,
             participants,
             shares,
-                splitDetails,
-            LocalDateTime.now()
+            splitDetails != null ? splitDetails : existingExpense.getSplitDetails(),
+            LocalDateTime.now(),
+            isSettleUp
         );
         
         updatedExpense.setDescription(description != null ? description : existingExpense.getDescription());
         updatedExpense.setGroup(existingExpense.getGroup());
         
+        // Step 4: Apply new balance changes
         expenseManager.updateExpense(updatedExpense);
+        
         return updatedExpense;
     }
     
@@ -196,6 +206,7 @@ public class ExpenseService {
      *
      * @param expenseId The ID of the expense to delete
      */
+    @Transactional
     public void deleteExpense(String expenseId) {
         Expense expenseToDelete = expenseManager.getExpenseById(expenseId);
         
@@ -286,6 +297,107 @@ public class ExpenseService {
             processedDetails.put("amounts", userAmounts);
         }
         
+        // Handle adjustment splits - convert user IDs to User objects
+        if (splitType == SplitTypes.ADJUSTMENT_SPLIT && splitDetails.containsKey("adjustments")) {
+            @SuppressWarnings("unchecked")
+            Map<String, Double> userIdAdjustments = (Map<String, Double>) splitDetails.get("adjustments");
+
+            Map<User, Double> userAdjustments = new HashMap<>();
+            for (Map.Entry<String, Double> entry : userIdAdjustments.entrySet()) {
+                User user = userService.getUser(entry.getKey());
+                userAdjustments.put(user, entry.getValue());
+            }
+
+            processedDetails.put("adjustments", userAdjustments);
+        }
+        
         return processedDetails;
+    }
+    
+    /**
+     * Get the currently authenticated user's ID from the security context
+     */
+    private String getCurrentUserId() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new IllegalStateException("No authenticated user found");
+        }
+        return authentication.getName(); // This returns the userId (subject from JWT)
+    }
+    
+    /**
+     * Validate that the current user is authorized to create this expense.
+     * The user must be either the payer or one of the participants.
+     */
+    private void validateUserAuthorization(String currentUserId, String payerId, List<String> participantIds) {
+        boolean isAuthorized = currentUserId.equals(payerId) || participantIds.contains(currentUserId);
+        
+        if (!isAuthorized) {
+            throw new IllegalArgumentException(
+                "Unauthorized: You can only create expenses where you are either the payer or a participant"
+            );
+        }
+    }
+    
+    /**
+     * Validate that required split details are provided based on the split type
+     */
+    private void validateSplitDetails(SplitTypes splitType, Map<String, Object> splitDetails, List<String> participantIds) {
+        if (splitType == null) {
+            throw new IllegalArgumentException("Split type is required");
+        }
+        
+        switch (splitType) {
+            case EQUAL_SPLIT:
+                // No additional details required
+                break;
+                
+            case SPLIT_BY_PERCENTAGES:
+                if (splitDetails == null || !splitDetails.containsKey("percentages")) {
+                    throw new IllegalArgumentException("Split details with 'percentages' map is required for SPLIT_BY_PERCENTAGES");
+                }
+                @SuppressWarnings("unchecked")
+                Map<String, Double> percentages = (Map<String, Double>) splitDetails.get("percentages");
+                if (percentages.isEmpty()) {
+                    throw new IllegalArgumentException("Percentages map cannot be empty");
+                }
+                break;
+                
+            case SHARES_SPLIT:
+                if (splitDetails == null || !splitDetails.containsKey("shares")) {
+                    throw new IllegalArgumentException("Split details with 'shares' map is required for SHARES_SPLIT");
+                }
+                @SuppressWarnings("unchecked")
+                Map<String, Double> shares = (Map<String, Double>) splitDetails.get("shares");
+                if (shares.isEmpty()) {
+                    throw new IllegalArgumentException("Shares map cannot be empty");
+                }
+                break;
+                
+            case EXACT_AMOUNT_SPLIT:
+                if (splitDetails == null || !splitDetails.containsKey("amounts")) {
+                    throw new IllegalArgumentException("Split details with 'amounts' map is required for EXACT_AMOUNT_SPLIT");
+                }
+                @SuppressWarnings("unchecked")
+                Map<String, Double> amounts = (Map<String, Double>) splitDetails.get("amounts");
+                if (amounts.isEmpty()) {
+                    throw new IllegalArgumentException("Amounts map cannot be empty");
+                }
+                break;
+                
+            case ADJUSTMENT_SPLIT:
+                if (splitDetails == null || !splitDetails.containsKey("adjustments")) {
+                    throw new IllegalArgumentException("Split details with 'adjustments' map is required for ADJUSTMENT_SPLIT");
+                }
+                @SuppressWarnings("unchecked")
+                Map<String, Double> adjustments = (Map<String, Double>) splitDetails.get("adjustments");
+                if (adjustments.isEmpty()) {
+                    throw new IllegalArgumentException("Adjustments map cannot be empty");
+                }
+                break;
+                
+            default:
+                throw new IllegalArgumentException("Unsupported split type: " + splitType);
+        }
     }
 }

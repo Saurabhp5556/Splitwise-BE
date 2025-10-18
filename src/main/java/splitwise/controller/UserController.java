@@ -1,16 +1,20 @@
 package splitwise.controller;
 
+import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import splitwise.dto.UpdateUserRequest;
+import splitwise.dto.UserResponse;
 import splitwise.model.User;
+import splitwise.service.DtoMapperService;
 import splitwise.service.UserService;
 
 import java.util.List;
-import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/users")
@@ -21,69 +25,77 @@ public class UserController {
     @Autowired
     private UserService userService;
 
-    @GetMapping("/health")
-    public ResponseEntity<String> health() {
-        return ResponseEntity.ok("Healthy");
-    }
-
-    @PostMapping
-    public ResponseEntity<User> createUser(@RequestBody Map<String, String> request) {
-        logger.info("Creating user with request: {}", request);
-        
-        String id = request.get("userId");
-        String name = request.get("name");
-        String email = request.get("email");
-        String mobile = request.get("mobile");
-
-        if (id == null || id.trim().isEmpty()) {
-            throw new IllegalArgumentException("User ID is required and cannot be empty");
-        }
-        if (name == null || name.trim().isEmpty()) {
-            throw new IllegalArgumentException("Name is required and cannot be empty");
-        }
-        if (email == null || email.trim().isEmpty()) {
-            throw new IllegalArgumentException("Email is required and cannot be empty");
-        }
-
-        User user = userService.createUser(id, name, email, mobile);
-        logger.info("Successfully created user with ID: {}", user.getUserId());
-        return ResponseEntity.status(HttpStatus.CREATED).body(user);
-    }
+    @Autowired
+    private DtoMapperService dtoMapper;
 
     @GetMapping
-    public ResponseEntity<List<User>> getAllUsers() {
+    public ResponseEntity<List<UserResponse>> getAllUsers() {
         logger.info("Fetching all users");
         List<User> users = userService.getAllUsers();
+        List<UserResponse> response = users.stream()
+                .map(dtoMapper::toUserResponse)
+                .collect(Collectors.toList());
         logger.info("Found {} users", users.size());
-        return ResponseEntity.ok(users);
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/{userId}")
-    public ResponseEntity<User> getUserById(@PathVariable String userId) {
+    public ResponseEntity<UserResponse> getUserById(@PathVariable String userId) {
         logger.info("Fetching user with ID: {}", userId);
         User user = userService.getUser(userId);
+        UserResponse response = dtoMapper.toUserResponse(user);
         logger.info("Successfully found user: {}", user.getName());
-        return ResponseEntity.ok(user);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<UserResponse> getCurrentUser(Authentication authentication) {
+        String userId = authentication.getName();
+        logger.info("Fetching current user with ID: {}", userId);
+        User user = userService.getUser(userId);
+        UserResponse response = dtoMapper.toUserResponse(user);
+        return ResponseEntity.ok(response);
+    }
+
+    @PutMapping("/{userId}")
+    public ResponseEntity<UserResponse> updateUser(
+            @PathVariable("userId") String userId,
+            @Valid @RequestBody UpdateUserRequest request,
+            Authentication authentication) {
+        
+        // Users can only update their own profile unless they're admin
+        String currentUserId = authentication.getName();
+        boolean isAdmin = authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        
+        if (!currentUserId.equals(userId) && !isAdmin) {
+            throw new SecurityException("You can only update your own profile");
+        }
+        
+        logger.info("Updating user with ID: {}", userId);
+        User user = userService.updateUser(userId, request.getName(), request.getEmail(), request.getMobile());
+        UserResponse response = dtoMapper.toUserResponse(user);
+        logger.info("Successfully updated user with ID: {}", userId);
+        return ResponseEntity.ok(response);
     }
 
     @DeleteMapping("/{userId}")
-    public ResponseEntity<Void> deleteUser(@PathVariable("userId") String userId) {
+    public ResponseEntity<Void> deleteUser(
+            @PathVariable("userId") String userId,
+            Authentication authentication) {
+        
+        // Users can only delete their own account unless they're admin
+        String currentUserId = authentication.getName();
+        boolean isAdmin = authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        
+        if (!currentUserId.equals(userId) && !isAdmin) {
+            throw new SecurityException("You can only delete your own account");
+        }
+        
         logger.info("Deleting user with ID: {}", userId);
         userService.deleteUser(userId);
         logger.info("Successfully deleted user with ID: {}", userId);
         return ResponseEntity.noContent().build();
-    }
-
-    @PutMapping("/{userId}")
-    public ResponseEntity<User> updateUser(@PathVariable("userId") String userId, @RequestBody Map<String, String> request) {
-        logger.info("Updating user with ID: {} with request: {}", userId, request);
-        
-        String name = request.get("name");
-        String email = request.get("email");
-        String mobile = request.get("mobile");
-
-        User user = userService.updateUser(userId, name, email, mobile);
-        logger.info("Successfully updated user with ID: {}", userId);
-        return ResponseEntity.ok(user);
     }
 }

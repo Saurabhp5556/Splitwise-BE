@@ -2,12 +2,14 @@ package splitwise.service;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import splitwise.model.Group;
 import splitwise.model.User;
 import splitwise.repository.GroupRepository;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 public class GroupService {
@@ -23,13 +25,14 @@ public class GroupService {
 
     /**
      * Creates a new group with the specified name, description, and initial members.
-     * Automatically generates a unique string-based group ID (e.g., "g1", "g2", etc.).
+     * Automatically generates a unique UUID-based group ID to prevent race conditions.
      *
      * @param name The name of the group
      * @param description Optional description of the group
      * @param userIds List of user IDs to add as initial group members
      * @return The created group with generated ID
      */
+    @Transactional
     public Group createGroup(String name, String description, List<String> userIds) {
         Group group = new Group();
         
@@ -50,29 +53,13 @@ public class GroupService {
     }
     
     /**
-     * Generates a unique group ID in the format "g{number}" (e.g., "g1", "g2", "g3").
-     * Finds the highest existing group ID number and increments it by 1.
+     * Generates a unique group ID using UUID to prevent race conditions.
+     * Format: "g_" + UUID
      *
      * @return A unique group ID string
      */
     private String generateGroupId() {
-        List<Group> allGroups = groupRepository.findAll();
-        int maxId = 0;
-        
-        // Find the highest existing group ID number
-        for (Group group : allGroups) {
-            String groupId = group.getGroupId();
-            if (groupId != null && groupId.startsWith("g")) {
-                try {
-                    int id = Integer.parseInt(groupId.substring(1));
-                    maxId = Math.max(maxId, id);
-                } catch (NumberFormatException e) {
-                    // Skip invalid group IDs that don't follow the "g{number}" format
-                }
-            }
-        }
-        
-        return "g" + (maxId + 1);
+        return "g_" + UUID.randomUUID().toString();
     }
 
     public Group getGroup(String groupId) {
@@ -84,6 +71,7 @@ public class GroupService {
         return groupRepository.findAll();
     }
 
+    @Transactional
     public Group addUserToGroup(String groupId, String userId) {
         Group group = getGroup(groupId);
         User user = userService.getUser(userId);
@@ -97,6 +85,7 @@ public class GroupService {
         return groupRepository.save(group);
     }
 
+    @Transactional
     public Group removeUserFromGroup(String groupId, String userId) {
         Group group = getGroup(groupId);
         User user = userService.getUser(userId);
@@ -172,6 +161,7 @@ public class GroupService {
         );
     }
 
+    @Transactional
     public void deleteGroup(String groupId) {
         if (!groupRepository.existsById(groupId)) {
             throw new IllegalArgumentException("Group with ID " + groupId + " not found");
@@ -179,6 +169,7 @@ public class GroupService {
         groupRepository.deleteById(groupId);
     }
 
+    @Transactional
     public Group updateGroup(String groupId, String name, String description) {
         Group group = getGroup(groupId);
         
