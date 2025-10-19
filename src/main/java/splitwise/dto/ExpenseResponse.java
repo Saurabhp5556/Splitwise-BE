@@ -20,4 +20,5 @@ public class ExpenseResponse {
     private LocalDateTime timestamp;
     private String groupId;
     private String groupName;
+    private Boolean isSettleUp;
 }
