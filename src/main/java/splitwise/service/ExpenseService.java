@@ -188,6 +188,7 @@ public class ExpenseService {
         
         updatedExpense.setDescription(description != null ? description : existingExpense.getDescription());
         updatedExpense.setGroup(existingExpense.getGroup());
+        updatedExpense.setVersion(existingExpense.getVersion());
         
         // Step 4: Apply new balance changes
         expenseManager.updateExpense(updatedExpense);

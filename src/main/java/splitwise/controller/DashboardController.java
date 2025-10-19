@@ -51,18 +51,18 @@ public class DashboardController {
     }
 
     /**
-     * Get all users with whom the current user has balances
+     * Get all friends with whom the current user has balances, including transaction breakdown
      */
-    @GetMapping("/users/{userId}/balances")
-    public ResponseEntity<Map<String, Object>> getUserBalances(@PathVariable String userId) {
-        logger.info("Fetching user balances for user: {}", userId);
+    @GetMapping("/users/{userId}/friends")
+    public ResponseEntity<Map<String, Object>> getUserFriends(@PathVariable String userId) {
+        logger.info("Fetching friends with transaction breakdown for user: {}", userId);
         
         if (userId == null || userId.trim().isEmpty()) {
             throw new IllegalArgumentException("User ID is required and cannot be empty");
         }
         
-        Map<String, Object> balancesData = dashboardService.getUserBalances(userId);
-        logger.info("Successfully retrieved balances data for user: {}", userId);
-        return ResponseEntity.ok(balancesData);
+        Map<String, Object> friendsData = dashboardService.getUserFriendsWithTransactions(userId);
+        logger.info("Successfully retrieved friends data for user: {}", userId);
+        return ResponseEntity.ok(friendsData);
     }
 }
