@@ -79,7 +79,7 @@ public class DashboardService {
             groupData.put("memberBalances", memberBalances);
             groupData.put("totalBalance", groupBalance);
 
-            group.setUserList(null);    //removing userList from response
+            group.setUserList(group.getUserList());
 
             groupData.put("group", group);
             
