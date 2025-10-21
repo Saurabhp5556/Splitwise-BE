@@ -21,4 +21,5 @@ public class ExpenseResponse {
     private String groupId;
     private String groupName;
     private Boolean isSettleUp;
+    private Map<String, Object> splitDetails;
 }
