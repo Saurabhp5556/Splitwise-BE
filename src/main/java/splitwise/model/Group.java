@@ -35,4 +35,8 @@ public class Group {
     
     @Version
     private Long version;
+
+    @ManyToOne
+    @JoinColumn(name = "created_by")
+    private User createdBy;
 }

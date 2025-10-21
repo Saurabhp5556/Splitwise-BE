@@ -22,7 +22,7 @@ public class DtoMapperService {
             return null;
         }
         UserResponse dto = new UserResponse();
-        dto.setId(user.getUserId());
+        dto.setUserId(user.getUserId());
         dto.setName(user.getName());
         dto.setEmail(user.getEmail());
         dto.setMobile(user.getMobile());

@@ -33,7 +33,7 @@ public class GroupService {
      * @return The created group with generated ID
      */
     @Transactional
-    public Group createGroup(String name, String description, List<String> userIds) {
+    public Group createGroup(String name, String description, List<String> userIds, String currentUserId) {
         Group group = new Group();
         
         // Generate a unique group ID in format "g1", "g2", etc.
@@ -41,6 +41,7 @@ public class GroupService {
         group.setGroupId(groupId);
         group.setName(name);
         group.setDescription(description);
+        group.setCreatedBy(userService.getUser(currentUserId));
 
         // Convert user IDs to User objects and add to group
         List<User> users = new ArrayList<>();

@@ -5,10 +5,12 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import splitwise.model.Group;
 import splitwise.service.GroupService;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -22,7 +24,7 @@ public class GroupController {
     private GroupService groupService;
 
     @PostMapping
-    public ResponseEntity<Group> createGroup(@RequestBody Map<String, Object> request) {
+    public ResponseEntity<Group> createGroup(@RequestBody Map<String, Object> request, Authentication authentication) {
         logger.info("Creating group with request: {}", request);
         
         String name = (String) request.get("name");
@@ -33,11 +35,14 @@ public class GroupController {
         if (name == null || name.trim().isEmpty()) {
             throw new IllegalArgumentException("Group name is required and cannot be empty");
         }
-        if (userIds == null || userIds.isEmpty()) {
-            throw new IllegalArgumentException("At least one user ID is required to create a group");
+
+        String currentUserId = authentication.getName();
+        userIds = (userIds == null) ? new ArrayList<>() : new ArrayList<>(userIds);
+        if (!userIds.contains(currentUserId)) {
+            userIds.add(currentUserId);
         }
 
-        Group group = groupService.createGroup(name, description, userIds);
+        Group group = groupService.createGroup(name, description, userIds,currentUserId);
         logger.info("Successfully created group with ID: {} and name: {}", group.getGroupId(), group.getName());
         return ResponseEntity.status(HttpStatus.CREATED).body(group);
     }
