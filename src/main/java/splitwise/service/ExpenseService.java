@@ -63,7 +63,8 @@ public class ExpenseService {
         Map<User, Double> shares = split.calculateSplit(amount, participants, processedSplitDetails);
         
         String expenseId = UUID.randomUUID().toString();
-        Expense expense = new Expense(expenseId, title, splitType, amount, payer, participants, shares, splitDetails, LocalDateTime.now(), isSettleUp);
+        User createdBy = userService.getUser(currentUserId);
+        Expense expense = new Expense(expenseId, title, splitType, amount, payer, participants, shares, splitDetails, LocalDateTime.now(), isSettleUp, createdBy);
         expense.setDescription(description);
         
         expenseManager.addExpense(expense);
@@ -122,7 +123,8 @@ public class ExpenseService {
         Map<User, Double> shares = split.calculateSplit(amount, participants, processedSplitDetails);
         
         String expenseId = UUID.randomUUID().toString();
-        Expense expense = new Expense(expenseId, title, splitType,amount, payer, participants, shares, splitDetails,  LocalDateTime.now(), isSettleUp);
+        User createdBy = userService.getUser(currentUserId);
+        Expense expense = new Expense(expenseId, title, splitType, amount, payer, participants, shares, splitDetails, LocalDateTime.now(), isSettleUp, createdBy);
         expense.setDescription(description);
         expense.setGroup(group);
         
@@ -172,18 +174,22 @@ public class ExpenseService {
         } else {
             shares = existingExpense.getShares();
         }
-        
+
+        User updatedBy = userService.getUser(getCurrentUserId());
         Expense updatedExpense = new Expense(
-            expenseId,
-            title != null ? title : existingExpense.getTitle(),
-            finalSplitType,
-            finalAmount,
-            payer,
-            participants,
-            shares,
-            splitDetails != null ? splitDetails : existingExpense.getSplitDetails(),
-            LocalDateTime.now(),
-            isSettleUp
+                expenseId,
+                title != null ? title : existingExpense.getTitle(),
+                finalSplitType,
+                finalAmount,
+                payer,
+                participants,
+                shares,
+                splitDetails != null ? splitDetails : existingExpense.getSplitDetails(),
+                existingExpense.getTimestamp(),
+                isSettleUp,
+                existingExpense.getCreatedBy(),
+                updatedBy,
+                LocalDateTime.now()
         );
         
         updatedExpense.setDescription(description != null ? description : existingExpense.getDescription());

@@ -56,6 +56,13 @@ public class DtoMapperService {
         response.setGroupId(expense.getGroup() != null ? expense.getGroup().getGroupId() : null);
         response.setIsSettleUp(expense.getIsSettleUp());
         response.setSplitDetails(expense.getSplitDetails());
+        response.setCreatedBy(toUserSummaryDTO(expense.getCreatedBy()));
+        if (expense.getUpdatedBy() != null) {
+            response.setUpdatedBy(toUserSummaryDTO(expense.getUpdatedBy()));
+        }
+        if (expense.getUpdatedAt() != null) {
+            response.setUpdatedAt(expense.getUpdatedAt());
+        }
 
         // Map payer
         if (expense.getPayer() != null) {
