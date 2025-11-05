@@ -3,9 +3,11 @@ package splitwise.service;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import splitwise.dto.GroupMember;
 import splitwise.model.Group;
 import splitwise.model.User;
 import splitwise.repository.GroupRepository;
+import splitwise.repository.UserRepository;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -22,6 +24,9 @@ public class GroupService {
     
     @Autowired
     private GroupRepository groupRepository;
+
+    @Autowired
+    private UserRepository userRepository;
 
     /**
      * Creates a new group with the specified name, description, and initial members.
@@ -187,5 +192,27 @@ public class GroupService {
     
     public List<Group> getGroupsByUserId(String userId) {
         return groupRepository.findGroupsByUserId(userId);
+    }
+
+    @Transactional
+    public User createUser(GroupMember memberRequest) {
+        User user = new User();
+        user.setUserId("u_" + UUID.randomUUID());
+        user.setName(memberRequest.getName());
+        user.setEmail(memberRequest.getEmail());
+        user.setMobile(memberRequest.getMobile());
+        user.setRole("USER");
+        return userRepository.save(user);
+    }
+
+    @Transactional
+    public Group addUsersToGroup(String groupId, List<User> users) {
+        Group group = getGroup(groupId);
+        List<User> alreadyMembers = group.getUserList();
+
+        List<User> usersToAdd = users.stream().filter(user -> !alreadyMembers.contains(user)).toList();
+
+        group.getUserList().addAll(usersToAdd);
+        return groupRepository.save(group);
     }
 }
