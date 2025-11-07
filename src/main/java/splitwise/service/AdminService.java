@@ -3,6 +3,7 @@ package splitwise.service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.CacheManager;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import splitwise.repository.*;
@@ -36,19 +37,23 @@ public class AdminService {
     @Autowired
     private TransactionRepository transactionRepository;
 
+    @Autowired
+    private CacheManager cacheManager;
+
     /**
-     * Clears all data from the database.
-     * 
+     * Clears all data from the database and cache.
+     *
      * This method deletes all records from all tables in the correct order
-     * to avoid foreign key constraint violations.
-     * 
+     * to avoid foreign key constraint violations, and then clears all caches.
+     *
      * Deletion order:
      * 1. Transactions (no dependencies)
      * 2. UserPairs (balance records)
      * 3. Expenses (references users and groups)
      * 4. Groups (references users via many-to-many)
      * 5. Users (referenced by other entities)
-     * 
+     * 6. All caches (balances, users, groups, expenses)
+     *
      * @return Map containing the count of deleted records for each entity type
      */
     @Transactional
@@ -89,6 +94,10 @@ public class AdminService {
             userRepository.deleteAll();
             deletionStats.put("users", (int) userCount);
             logger.info("Deleted {} users", userCount);
+            
+            // 6. Clear all caches
+            clearAllCaches();
+            logger.info("All caches cleared");
             
             // Calculate total
             int totalDeleted = deletionStats.values().stream().mapToInt(Integer::intValue).sum();
@@ -147,5 +156,21 @@ public class AdminService {
         }
         
         return validation;
+    }
+
+    /**
+     * Clears all application caches.
+     * This ensures that cached data is removed when the database is cleared.
+     */
+    private void clearAllCaches() {
+        if (cacheManager != null) {
+            cacheManager.getCacheNames().forEach(cacheName -> {
+                var cache = cacheManager.getCache(cacheName);
+                if (cache != null) {
+                    cache.clear();
+                    logger.info("Cleared cache: {}", cacheName);
+                }
+            });
+        }
     }
 }

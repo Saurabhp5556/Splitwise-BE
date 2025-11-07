@@ -22,7 +22,7 @@ public class DtoMapperService {
             return null;
         }
         UserResponse dto = new UserResponse();
-        dto.setId(user.getUserId());
+        dto.setUserId(user.getUserId());
         dto.setName(user.getName());
         dto.setEmail(user.getEmail());
         dto.setMobile(user.getMobile());
@@ -54,7 +54,16 @@ public class DtoMapperService {
         response.setSplitType(expense.getSplitType());
         response.setTimestamp(expense.getTimestamp());
         response.setGroupId(expense.getGroup() != null ? expense.getGroup().getGroupId() : null);
-        
+        response.setIsSettleUp(expense.getIsSettleUp());
+        response.setSplitDetails(expense.getSplitDetails());
+        response.setCreatedBy(toUserSummaryDTO(expense.getCreatedBy()));
+        if (expense.getUpdatedBy() != null) {
+            response.setUpdatedBy(toUserSummaryDTO(expense.getUpdatedBy()));
+        }
+        if (expense.getUpdatedAt() != null) {
+            response.setUpdatedAt(expense.getUpdatedAt());
+        }
+
         // Map payer
         if (expense.getPayer() != null) {
             response.setPayer(toUserSummaryDTO(expense.getPayer()));

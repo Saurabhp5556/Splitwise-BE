@@ -20,4 +20,9 @@ public class ExpenseResponse {
     private LocalDateTime timestamp;
     private String groupId;
     private String groupName;
+    private Boolean isSettleUp;
+    private Map<String, Object> splitDetails;
+    private UserSummaryDTO createdBy;
+    private UserSummaryDTO updatedBy;
+    private LocalDateTime updatedAt;
 }
