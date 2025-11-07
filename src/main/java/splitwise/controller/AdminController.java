@@ -122,7 +122,7 @@ public class AdminController {
     @GetMapping("/health")
     public ResponseEntity<Map<String, String>> adminHealth() {
         return ResponseEntity.ok(Map.of(
-                "status", "Admin endpoints available || V-1.0-SNAPSHOT",
+                "status", "Admin endpoints available || V-1.0.1",
                 "authentication", "Basic Auth required for destructive operations"
         ));
     }
