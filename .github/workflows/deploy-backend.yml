@@ -17,18 +17,21 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Build JAR
+      - name: Build WAR
         run: mvn clean package -DskipTests
 
-      - name: Copy JAR to VPS
+      - name: List target directory
+        run: ls -la target/
+
+      - name: Copy WAR to VPS
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          source: "target/*.jar"
-          target: "/app/app.jar"
-          strip_components: 2
+          source: "target/*.war"
+          target: "/app/Splitwise-BE.war"
+          strip_components: 1
 
       - name: Run deploy script on VPS
         uses: appleboy/ssh-action@v0.1.6
