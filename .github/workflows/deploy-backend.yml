@@ -26,81 +26,17 @@ jobs:
       - name: Install SSH tools
         run: sudo apt-get update && sudo apt-get install -y sshpass
 
-      - name: Copy JAR to VPS
+      - name: Deploy to VPS
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_PASSWORD: ${{ secrets.VPS_PASSWORD }}
         run: |
-          sshpass -p "$VPS_PASSWORD" ssh -o StrictHostKeyChecking=no "$VPS_USER@$VPS_HOST" "mkdir -p /app/tmp"
-          sshpass -p "$VPS_PASSWORD" scp -o StrictHostKeyChecking=no target/*.jar "$VPS_USER@$VPS_HOST:/app/tmp/Splitwise-BE.jar"
+          # Copy JAR file
+          echo "Copying JAR to server..."
+          sshpass -p "$VPS_PASSWORD" scp -o StrictHostKeyChecking=no target/*.jar "$VPS_USER@$VPS_HOST:/app/Splitwise-BE.jar"
 
-      - name: Deploy application on VPS
-        env:
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_USER: ${{ secrets.VPS_USER }}
-          VPS_PASSWORD: ${{ secrets.VPS_PASSWORD }}
-        run: |
-          sshpass -p "$VPS_PASSWORD" ssh -o StrictHostKeyChecking=no "$VPS_USER@$VPS_HOST" bash << 'ENDSSH'
-            set +e
-
-            echo "=== Starting deployment ==="
-
-            # Stop existing application
-            echo "Checking for existing application..."
-            PID=$(pgrep -f "Splitwise-BE.jar")
-            if [ -n "$PID" ]; then
-              echo "Stopping existing application (PID: $PID)"
-              kill $PID
-              sleep 5
-
-              # Force kill if still running
-              if pgrep -f "Splitwise-BE.jar" > /dev/null; then
-                echo "Force killing application..."
-                kill -9 $PID
-                sleep 1
-              fi
-              echo "Application stopped successfully"
-            else
-              echo "No existing application found"
-            fi
-
-            # Verify new JAR exists
-            echo "Checking for new JAR file..."
-            if [ ! -f /app/tmp/Splitwise-BE.jar ]; then
-              echo "ERROR: JAR file not found at /app/tmp/Splitwise-BE.jar"
-              exit 1
-            fi
-            echo "New JAR file found"
-
-            # Copy new JAR
-            echo "Copying new JAR to /app/..."
-            cp /app/tmp/Splitwise-BE.jar /app/Splitwise-BE.jar
-            if [ $? -ne 0 ]; then
-              echo "ERROR: Failed to copy JAR file"
-              exit 1
-            fi
-            echo "JAR copied successfully"
-
-            # Cleanup
-            echo "Cleaning up temporary files..."
-            rm -rf /app/tmp
-
-            # Start new application
-            echo "Starting application..."
-            cd /app
-            nohup java -jar /app/Splitwise-BE.jar > /app/app.log 2>&1 &
-
-            # Wait and verify it started
-            sleep 3
-            NEW_PID=$(pgrep -f "Splitwise-BE.jar")
-            if [ -n "$NEW_PID" ]; then
-              echo "=== Application deployed successfully! (PID: $NEW_PID) ==="
-              exit 0
-            else
-              echo "=== ERROR: Application failed to start ==="
-              echo "Last 20 lines of application log:"
-              tail -n 20 /app/app.log 2>/dev/null || echo "No log file found"
-              exit 1
-            fi
-          ENDSSH
+          # Restart service
+          echo "Restarting application service..."
+          sshpass -p "$VPS_PASSWORD" ssh -o StrictHostKeyChecking=no "$VPS_USER@$VPS_HOST" \
+            "systemctl restart splitwise && systemctl is-active splitwise && echo 'Deployment successful!'"
