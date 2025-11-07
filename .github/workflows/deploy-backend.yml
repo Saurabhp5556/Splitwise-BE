@@ -30,7 +30,7 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           password: ${{ secrets.VPS_PASSWORD }}
           source: "target/*.jar"
-          target: "/app"
+          target: "/app/tmp"
           strip_components: 1
 
       - name: Deploy application on VPS
@@ -49,7 +49,10 @@ jobs:
               # Force kill if still running
               kill -9 $PID 2>/dev/null || true
             fi
-
+            
+            cp /app/tmp/Spliwise-BE.jar /app/Spliwise-BE.jar
+            rm -rf /app/tmp
+            
             # Start new application
             echo "Starting application..."
             nohup java -jar /app/Splitwise-BE.jar > /app/app.log 2>&1 &
