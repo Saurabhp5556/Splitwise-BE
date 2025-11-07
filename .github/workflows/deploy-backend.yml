@@ -41,7 +41,7 @@ jobs:
           password: ${{ secrets.VPS_PASSWORD }}
           script: |
             # Stop existing application
-            PID=$(pgrep -f "Splitwise-BE.jar") || true
+            PID=$(pgrep -f "Splitwise-BE.jar") 
             if [ -n "$PID" ]; then
               echo "Stopping existing application (PID: $PID)"
               kill $PID || true
