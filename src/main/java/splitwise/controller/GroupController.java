@@ -1,5 +1,6 @@
 package splitwise.controller;
 
+import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -7,8 +8,12 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import splitwise.dto.GroupMember;
+import splitwise.dto.GroupMembersRequest;
 import splitwise.model.Group;
+import splitwise.model.User;
 import splitwise.service.GroupService;
+import splitwise.service.UserService;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -22,6 +27,9 @@ public class GroupController {
 
     @Autowired
     private GroupService groupService;
+
+    @Autowired
+    private UserService userService;
 
     @PostMapping
     public ResponseEntity<Group> createGroup(@RequestBody Map<String, Object> request, Authentication authentication) {
@@ -64,16 +72,24 @@ public class GroupController {
     }
 
     @PostMapping("/{groupId}/users")
-    public ResponseEntity<Group> addUserToGroup(@PathVariable String groupId, @RequestBody Map<String, String> request) {
-        logger.info("Adding user to group {} with request: {}", groupId, request);
-        
-        String userId = request.get("userId");
-        if (userId == null || userId.trim().isEmpty()) {
-            throw new IllegalArgumentException("User ID is required and cannot be empty");
+    public ResponseEntity<Group> addUsersToGroup(@PathVariable String groupId, @Valid @RequestBody GroupMembersRequest request) {
+        logger.info("Adding users to group {} with request: {}", groupId, request);
+
+        List<GroupMember> members = request.getMembers();
+
+        List<User> users = new ArrayList<>();
+        for (GroupMember member : members) {
+            User user;
+            if (member.getUserId() != null) {
+                user = userService.getUser(member.getUserId());
+            } else {
+                user = groupService.createUser(member);
+            }
+            users.add(user);
         }
 
-        Group group = groupService.addUserToGroup(groupId, userId);
-        logger.info("Successfully added user {} to group {}", userId, groupId);
+        Group group = groupService.addUsersToGroup(groupId, users);
+        logger.info("Successfully added users {} to group {}", users, groupId);
         return ResponseEntity.ok(group);
     }
 
