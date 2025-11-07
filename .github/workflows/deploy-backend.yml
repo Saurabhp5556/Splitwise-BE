@@ -32,11 +32,41 @@ jobs:
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_PASSWORD: ${{ secrets.VPS_PASSWORD }}
         run: |
+          echo "Deploying to VPS..."
+
+          sshpass -p "$VPS_PASSWORD" ssh -o StrictHostKeyChecking=no "$VPS_USER@$VPS_HOST" << 'ENDSSH'
+            set -e
+
+            # Stop the service
+            echo "Stopping service..."
+            systemctl stop splitwise || true
+
+            # Clean up any lingering processes
+            echo "Cleaning up processes..."
+            pkill -9 -f "Splitwise-BE.jar" || true
+            sleep 2
+          ENDSSH
+
           # Copy JAR file
           echo "Copying JAR to server..."
           sshpass -p "$VPS_PASSWORD" scp -o StrictHostKeyChecking=no target/*.jar "$VPS_USER@$VPS_HOST:/app/Splitwise-BE.jar"
 
-          # Restart service
-          echo "Restarting application service..."
-          sshpass -p "$VPS_PASSWORD" ssh -o StrictHostKeyChecking=no "$VPS_USER@$VPS_HOST" \
-            "systemctl restart splitwise && systemctl is-active splitwise && echo 'Deployment successful!'"
+          # Start service and verify
+          echo "Starting service..."
+          sshpass -p "$VPS_PASSWORD" ssh -o StrictHostKeyChecking=no "$VPS_USER@$VPS_HOST" << 'ENDSSH'
+            systemctl start splitwise
+            sleep 3
+
+            if systemctl is-active --quiet splitwise; then
+              echo "✓ Deployment successful!"
+              systemctl status splitwise --no-pager
+            else
+              echo "✗ Deployment failed!"
+              echo "Service status:"
+              systemctl status splitwise --no-pager || true
+              echo ""
+              echo "Last 20 lines of logs:"
+              tail -n 20 /app/app.log || true
+              exit 1
+            fi
+          ENDSSH
