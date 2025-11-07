@@ -30,7 +30,7 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           password: ${{ secrets.VPS_PASSWORD }}
           source: "target/*.jar"
-          target: "/app/Splitwise-BE.jar"
+          target: "/app"
           strip_components: 1
 
       - name: Deploy application on VPS
