@@ -17,27 +17,39 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Build WAR
+      - name: Build JAR
         run: mvn clean package -DskipTests
 
       - name: List target directory
         run: ls -la target/
 
-      - name: Copy WAR to VPS
+      - name: Copy JAR to VPS
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           password: ${{ secrets.VPS_PASSWORD }}
-          source: "target/*.war"
-          target: "/app/Splitwise-BE.war"
+          source: "target/*.jar"
+          target: "/app/Splitwise-BE.jar"
           strip_components: 1
 
-      - name: Run deploy script on VPS
+      - name: Deploy application on VPS
         uses: appleboy/ssh-action@v0.1.6
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           password: ${{ secrets.VPS_PASSWORD }}
           script: |
-            bash /Splitwise-BE/deploy.sh
+            # Stop existing application
+            PID=$(pgrep -f "Splitwise-BE.jar")
+            if [ -n "$PID" ]; then
+              echo "Stopping existing application (PID: $PID)"
+              kill $PID
+              sleep 5
+            fi
+
+            # Start new application
+            echo "Starting application..."
+            nohup java -jar /app/Splitwise-BE.jar > /app/app.log 2>&1 &
+
+            echo "Application deployed successfully!"
