@@ -411,6 +411,10 @@ public class DashboardService {
         
         // Calculate balances from each expense
         for (Expense expense : groupExpenses) {
+            if (expense.getIsSettleUp() != null && expense.getIsSettleUp()) {
+                continue;
+            }
+
             User payer = expense.getPayer();
             Map<User, Double> shares = expense.getShares();
             
