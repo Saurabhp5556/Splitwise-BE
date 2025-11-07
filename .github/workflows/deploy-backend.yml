@@ -41,15 +41,24 @@ jobs:
           password: ${{ secrets.VPS_PASSWORD }}
           script: |
             # Stop existing application
-            PID=$(pgrep -f "Splitwise-BE.jar")
+            PID=$(pgrep -f "Splitwise-BE.jar") || true
             if [ -n "$PID" ]; then
               echo "Stopping existing application (PID: $PID)"
-              kill $PID
+              kill $PID || true
               sleep 5
+              # Force kill if still running
+              kill -9 $PID 2>/dev/null || true
             fi
 
             # Start new application
             echo "Starting application..."
             nohup java -jar /app/Splitwise-BE.jar > /app/app.log 2>&1 &
 
-            echo "Application deployed successfully!"
+            # Wait a moment and verify it started
+            sleep 2
+            NEW_PID=$(pgrep -f "Splitwise-BE.jar") || true
+            if [ -n "$NEW_PID" ]; then
+              echo "Application deployed successfully! (PID: $NEW_PID)"
+            else
+              echo "Warning: Could not verify application started"
+            fi
