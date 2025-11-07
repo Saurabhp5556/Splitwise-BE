@@ -40,28 +40,64 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           password: ${{ secrets.VPS_PASSWORD }}
           script: |
+            set +e  # Don't exit on error, we'll handle errors explicitly
+
+            echo "=== Starting deployment ==="
+
             # Stop existing application
-            PID=$(pgrep -f "Splitwise-BE.jar") 
+            echo "Checking for existing application..."
+            PID=$(pgrep -f "Splitwise-BE.jar")
             if [ -n "$PID" ]; then
               echo "Stopping existing application (PID: $PID)"
-              kill $PID || true
+              kill $PID 2>/dev/null
               sleep 5
+
               # Force kill if still running
-              kill -9 $PID 2>/dev/null || true
+              if pgrep -f "Splitwise-BE.jar" > /dev/null; then
+                echo "Force killing application..."
+                kill -9 $PID 2>/dev/null
+                sleep 1
+              fi
+              echo "Application stopped successfully"
+            else
+              echo "No existing application found"
             fi
-            
+
+            # Verify new JAR exists
+            echo "Checking for new JAR file..."
+            if [ ! -f /app/tmp/Splitwise-BE.jar ]; then
+              echo "ERROR: JAR file not found at /app/tmp/Splitwise-BE.jar"
+              exit 1
+            fi
+            echo "New JAR file found"
+
+            # Copy new JAR
+            echo "Copying new JAR to /app/..."
             cp /app/tmp/Splitwise-BE.jar /app/Splitwise-BE.jar
+            if [ $? -ne 0 ]; then
+              echo "ERROR: Failed to copy JAR file"
+              exit 1
+            fi
+            echo "JAR copied successfully"
+
+            # Cleanup
+            echo "Cleaning up temporary files..."
             rm -rf /app/tmp
-            
+
             # Start new application
             echo "Starting application..."
+            cd /app
             nohup java -jar /app/Splitwise-BE.jar > /app/app.log 2>&1 &
 
-            # Wait a moment and verify it started
-            sleep 2
-            NEW_PID=$(pgrep -f "Splitwise-BE.jar") || true
+            # Wait and verify it started
+            sleep 3
+            NEW_PID=$(pgrep -f "Splitwise-BE.jar")
             if [ -n "$NEW_PID" ]; then
-              echo "Application deployed successfully! (PID: $NEW_PID)"
+              echo "=== Application deployed successfully! (PID: $NEW_PID) ==="
+              exit 0
             else
-              echo "Warning: Could not verify application started"
+              echo "=== ERROR: Application failed to start ==="
+              echo "Last 20 lines of application log:"
+              tail -n 20 /app/app.log 2>/dev/null || echo "No log file found"
+              exit 1
             fi
