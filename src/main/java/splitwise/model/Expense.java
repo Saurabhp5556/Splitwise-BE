@@ -85,7 +85,20 @@ public class Expense {
     @Version
     private Long version;
 
-    public Expense(String id, String title, SplitTypes splitType,double amount, User payer, List<User> participants, Map<User, Double> shares, Map<String, Object> splitDetails, LocalDateTime timestamp, Boolean isSettleUp) {
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "created_by")
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+    private User createdBy;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "updated_by")
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+    private User updatedBy;
+
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+
+    public Expense(String id, String title, SplitTypes splitType, double amount, User payer, List<User> participants, Map<User, Double> shares, Map<String, Object> splitDetails, LocalDateTime timestamp, Boolean isSettleUp, User createdBy) {
         this.id = id;
         this.title = title;
         this.amount = amount;
@@ -96,6 +109,23 @@ public class Expense {
         this.splitDetails = splitDetails;
         this.timestamp = timestamp;
         this.isSettleUp = isSettleUp;
+        this.createdBy = createdBy;
+    }
+
+    public Expense(String id, String title, SplitTypes splitType, double amount, User payer, List<User> participants, Map<User, Double> shares, Map<String, Object> splitDetails, LocalDateTime timestamp, Boolean isSettleUp, User createdBy, User updatedBy, LocalDateTime updatedAt) {
+        this.id = id;
+        this.title = title;
+        this.amount = amount;
+        this.splitType = splitType;
+        this.payer = payer;
+        this.participants = participants;
+        this.shares = shares;
+        this.splitDetails = splitDetails;
+        this.timestamp = timestamp;
+        this.isSettleUp = isSettleUp;
+        this.createdBy = createdBy;
+        this.updatedBy = updatedBy;
+        this.updatedAt = updatedAt;
     }
     
     @JsonGetter("shares")
