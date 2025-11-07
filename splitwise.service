@@ -1,0 +1,16 @@
+[Unit]
+Description=Splitwise Backend Service
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/app
+ExecStart=/usr/bin/java -jar /app/Splitwise-BE.jar
+Restart=always
+RestartSec=10
+StandardOutput=append:/app/app.log
+StandardError=append:/app/app.log
+
+[Install]
+WantedBy=multi-user.target

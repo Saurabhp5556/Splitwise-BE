@@ -20,21 +20,23 @@ jobs:
       - name: Build JAR
         run: mvn clean package -DskipTests
 
-      - name: Copy JAR to VPS
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          source: "target/*.jar"
-          target: "/root/app/app.jar"
-          strip_components: 2
+      - name: List target directory
+        run: ls -la target/
 
-      - name: Run deploy script on VPS
-        uses: appleboy/ssh-action@v0.1.6
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          script: |
-            bash /Splitwise-BE/deploy.sh
+      - name: Install SSH tools
+        run: sudo apt-get update && sudo apt-get install -y sshpass
+
+      - name: Deploy to VPS
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PASSWORD: ${{ secrets.VPS_PASSWORD }}
+        run: |
+          # Copy JAR file
+          echo "Copying JAR to server..."
+          sshpass -p "$VPS_PASSWORD" scp -o StrictHostKeyChecking=no target/*.jar "$VPS_USER@$VPS_HOST:/app/Splitwise-BE.jar"
+
+          # Restart service
+          echo "Restarting application service..."
+          sshpass -p "$VPS_PASSWORD" ssh -o StrictHostKeyChecking=no "$VPS_USER@$VPS_HOST" \
+            "systemctl restart splitwise && systemctl is-active splitwise && echo 'Deployment successful!'"
