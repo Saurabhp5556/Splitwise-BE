@@ -22,6 +22,7 @@ public class SplitwiseApplicationTests {
 
 //    @Test
 //    void testExpenseManagement() {
+    // abc
 //        User alice = new User("u1", "Alice", "alice@gmail.com");
 //        User bob = new User("u2", "Bob", "bob@gmail.com");
 //        User charlie = new User("u3", "Charlie", "charlie@gmail.com");
