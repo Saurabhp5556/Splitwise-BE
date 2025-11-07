@@ -21,6 +21,7 @@ public class DashboardController {
     /**
      * Get complete dashboard data for a user
      */
+    @Deprecated
     @GetMapping("/users/{userId}")
     public ResponseEntity<Map<String, Object>> getUserDashboard(@PathVariable String userId) {
         logger.info("Fetching dashboard data for user: {}", userId);
