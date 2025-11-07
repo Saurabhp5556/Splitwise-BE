@@ -23,24 +23,26 @@ jobs:
       - name: List target directory
         run: ls -la target/
 
+      - name: Install SSH tools
+        run: sudo apt-get update && sudo apt-get install -y sshpass
+
       - name: Copy JAR to VPS
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          password: ${{ secrets.VPS_PASSWORD }}
-          source: "target/*.jar"
-          target: "/app/tmp"
-          strip_components: 1
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PASSWORD: ${{ secrets.VPS_PASSWORD }}
+        run: |
+          sshpass -p "$VPS_PASSWORD" ssh -o StrictHostKeyChecking=no "$VPS_USER@$VPS_HOST" "mkdir -p /app/tmp"
+          sshpass -p "$VPS_PASSWORD" scp -o StrictHostKeyChecking=no target/*.jar "$VPS_USER@$VPS_HOST:/app/tmp/Splitwise-BE.jar"
 
       - name: Deploy application on VPS
-        uses: appleboy/ssh-action@v0.1.6
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          password: ${{ secrets.VPS_PASSWORD }}
-          script: |
-            set +e  # Don't exit on error, we'll handle errors explicitly
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PASSWORD: ${{ secrets.VPS_PASSWORD }}
+        run: |
+          sshpass -p "$VPS_PASSWORD" ssh -o StrictHostKeyChecking=no "$VPS_USER@$VPS_HOST" bash << 'ENDSSH'
+            set +e
 
             echo "=== Starting deployment ==="
 
@@ -49,13 +51,13 @@ jobs:
             PID=$(pgrep -f "Splitwise-BE.jar")
             if [ -n "$PID" ]; then
               echo "Stopping existing application (PID: $PID)"
-              kill $PID 2>/dev/null
+              kill $PID
               sleep 5
 
               # Force kill if still running
               if pgrep -f "Splitwise-BE.jar" > /dev/null; then
                 echo "Force killing application..."
-                kill -9 $PID 2>/dev/null
+                kill -9 $PID
                 sleep 1
               fi
               echo "Application stopped successfully"
@@ -101,3 +103,4 @@ jobs:
               tail -n 20 /app/app.log 2>/dev/null || echo "No log file found"
               exit 1
             fi
+          ENDSSH
