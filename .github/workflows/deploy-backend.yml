@@ -50,7 +50,7 @@ jobs:
               kill -9 $PID 2>/dev/null || true
             fi
             
-            cp /app/tmp/Spliwise-BE.jar /app/Spliwise-BE.jar
+            cp /app/tmp/Splitwise-BE.jar /app/Splitwise-BE.jar
             rm -rf /app/tmp
             
             # Start new application
